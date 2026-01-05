@@ -62,6 +62,7 @@ export class RedisManager {
       // Configuration optimized for BOTH regular operations AND pub/sub
       // HocuspocusRedis uses .duplicate() which inherits these settings
       this.redisClient = new Redis(redisUrl, {
+        tls: redisUrl.startsWith("rediss://") ? { rejectUnauthorized: false } : undefined,
         lazyConnect: false, // Connect immediately for reliability (duplicates inherit this)
         keepAlive: 30000,
         connectTimeout: 10000,
