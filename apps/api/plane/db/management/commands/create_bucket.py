@@ -1,6 +1,7 @@
 # Python imports
 import os
 import boto3
+from botocore.config import Config
 from botocore.exceptions import ClientError
 
 # Django imports
@@ -15,11 +16,11 @@ class Command(BaseCommand):
         try:
             s3_client = boto3.client(
                 "s3",
-                endpoint_url=os.environ.get("AWS_S3_ENDPOINT_URL"),  # MinIO endpoint
-                aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID"),  # MinIO access key
-                aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY"),  # MinIO secret key
-                region_name=os.environ.get("AWS_REGION"),  # MinIO region
-                config=boto3.session.Config(signature_version="s3v4"),
+                endpoint_url=os.environ.get("AWS_S3_ENDPOINT_URL"),
+                aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID"),
+                aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY"),
+                region_name=os.environ.get("AWS_REGION"),
+                config=Config(signature_version="s3v4", s3={"addressing_style": "path"}),
             )
             # Get the bucket name from the environment
             bucket_name = os.environ.get("AWS_S3_BUCKET_NAME")
