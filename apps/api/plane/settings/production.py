@@ -4,11 +4,34 @@ import os
 
 from .common import *  # noqa
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = int(os.environ.get("DEBUG", 0)) == 1
+DEBUG = False
 
-# Honor the 'X-Forwarded-Proto' header for request.is_secure()
+# Allowed hosts for Render
+ALLOWED_HOSTS = [
+    ".onrender.com",
+    "localhost",
+    "127.0.0.1",
+]
+
+# Add custom domain if set
+if os.environ.get("RENDER_EXTERNAL_HOSTNAME"):
+    ALLOWED_HOSTS.append(os.environ.get("RENDER_EXTERNAL_HOSTNAME"))
+
+# CORS Configuration
+CORS_ALLOWED_ORIGINS = [
+    origin.strip() for origin in os.environ.get("CORS_ALLOWED_ORIGINS", "").split(",") if origin.strip()
+]
+CORS_ALLOW_CREDENTIALS = True
+
+# Security settings for production
+SECURE_SSL_REDIRECT = True
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+
+# Trust Render's proxy
+USE_X_FORWARDED_HOST = True
+USE_X_FORWARDED_PORT = True
 
 INSTALLED_APPS += ("scout_apm.django",)  # noqa
 

@@ -1,6 +1,7 @@
 import React from "react";
 import { useParams } from "next/navigation";
 import useSWRInfinite from "swr/infinite";
+import { API_BASE_URL } from "@plane/constants";
 import type { IWorkspaceIntegration } from "@plane/types";
 // services
 // ui
@@ -28,9 +29,7 @@ export function SelectRepository(props: Props) {
   const getKey = (pageIndex: number) => {
     if (!workspaceSlug || !integration) return;
 
-    return `${process.env.VITE_API_BASE_URL}/api/workspaces/${workspaceSlug}/workspace-integrations/${
-      integration.id
-    }/github-repositories/?page=${++pageIndex}`;
+    return `${API_BASE_URL}/api/workspaces/${workspaceSlug}/workspace-integrations/${integration.id}/github-repositories/?page=${++pageIndex}`;
   };
 
   const fetchGithubRepos = async (url: string) => {
