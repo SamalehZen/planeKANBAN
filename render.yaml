@@ -20,3 +20,106 @@ services:
       - fromGroup: plane-shared
       - key: NODE_ENV
         value: production
+services:
+  - type: worker
+    name: plane-worker
+    runtime: python
+    region: frankfurt
+    plan: free
+    buildCommand: |
+      cd apps/api
+      pip install -r requirements.txt
+    startCommand: |
+      cd apps/api
+      ./bin/docker-entrypoint-worker-render.sh
+  # Web App (React)
+  - type: web
+    name: plane-web
+    runtime: node
+    region: frankfurt
+    plan: free
+    buildCommand: cd apps/web && pnpm install && pnpm build
+    startCommand: cd apps/web && pnpm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_API_BASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_ADMIN_BASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SPACE_BASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_LIVE_BASE_URL
+        sync: false
+
+  # Admin Panel (God Mode)
+  - type: web
+    name: plane-admin
+    runtime: node
+    region: frankfurt
+    plan: free
+    buildCommand: cd apps/admin && pnpm install && pnpm build
+    startCommand: cd apps/admin && pnpm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+
+  # Space (Public Pages)
+  - type: web
+    name: plane-space
+    runtime: node
+    region: frankfurt
+    plan: free
+    buildCommand: cd apps/space && pnpm install && pnpm build
+    startCommand: cd apps/space && pnpm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+
+  # Live Collaboration (WebSocket)
+  - type: web
+    name: plane-live
+    runtime: node
+    region: frankfurt
+    plan: free
+    buildCommand: cd apps/live && pnpm install && pnpm build
+    startCommand: cd apps/live && pnpm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: REDIS_URL
+        sync: false
+
+  # API Backend (Django)
+  - type: web
+    name: plane-api
+    runtime: python
+    region: frankfurt
+    plan: free
+    buildCommand: cd apps/api && pip install -r requirements.txt
+    startCommand: cd apps/api && gunicorn plane.wsgi:application --bind 0.0.0.0:$PORT
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: DJANGO_SETTINGS_MODULE
+        value: plane.settings.production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DJANGO_SETTINGS_MODULE
+        value: plane.settings.production
+
+  # Background Worker (Celery)
+  - type: worker
+    name: plane-worker
+    runtime: python
+    region: frankfurt
+    plan: free
+    buildCommand: cd apps/api && pip install -r requirements.txt
+    startCommand: cd apps/api && celery -A plane worker -l info -B --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false

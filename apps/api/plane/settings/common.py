@@ -2,6 +2,7 @@
 
 # Python imports
 import os
+import ssl
 from urllib.parse import urlparse
 from urllib.parse import urljoin
 
@@ -138,8 +139,17 @@ AUTH_USER_MODEL = "db.User"
 
 # Database
 if bool(os.environ.get("DATABASE_URL")):
-    # Parse database configuration from $DATABASE_URL
-    DATABASES = {"default": dj_database_url.config()}
+    DATABASES = {
+        "default": dj_database_url.config(
+            default=os.environ.get("DATABASE_URL"),
+            conn_max_age=600,
+            conn_health_checks=True,
+            ssl_require=True,
+        )
+    }
+
+    DATABASES["default"]["CONN_MAX_AGE"] = 60
+    DATABASES["default"]["OPTIONS"] = {"sslmode": "require"}
 else:
     DATABASES = {
         "default": {
@@ -174,28 +184,19 @@ if os.environ.get("ENABLE_READ_REPLICA", "0") == "1":
 
 
 # Redis Config
-REDIS_URL = os.environ.get("REDIS_URL")
-REDIS_SSL = REDIS_URL and "rediss" in REDIS_URL
+REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
+REDIS_SSL = REDIS_URL.startswith("rediss://")
 
-if REDIS_SSL:
-    CACHES = {
-        "default": {
-            "BACKEND": "django_redis.cache.RedisCache",
-            "LOCATION": REDIS_URL,
-            "OPTIONS": {
-                "CLIENT_CLASS": "django_redis.client.DefaultClient",
-                "CONNECTION_POOL_KWARGS": {"ssl_cert_reqs": False},
-            },
-        }
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": REDIS_URL,
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            "CONNECTION_POOL_KWARGS": {"ssl_cert_reqs": None} if REDIS_SSL else {},
+        },
     }
-else:
-    CACHES = {
-        "default": {
-            "BACKEND": "django_redis.cache.RedisCache",
-            "LOCATION": REDIS_URL,
-            "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
-        }
-    }
+}
 
 # Password validations
 AUTH_PASSWORD_VALIDATORS = [
@@ -233,20 +234,31 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 
 # Storage Settings
-# Use Minio settings
-USE_MINIO = int(os.environ.get("USE_MINIO", 0)) == 1
+USE_MINIO = os.environ.get("USE_MINIO", "0") == "1"
 
 STORAGES = {"staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"}}
 STORAGES["default"] = {"BACKEND": "plane.settings.storage.S3Storage"}
+
 AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID", "access-key")
 AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY", "secret-key")
-AWS_STORAGE_BUCKET_NAME = os.environ.get("AWS_S3_BUCKET_NAME", "uploads")
+AWS_STORAGE_BUCKET_NAME = os.environ.get("AWS_S3_BUCKET_NAME", "plane-uploads")
+
 AWS_REGION = os.environ.get("AWS_REGION", "")
-AWS_DEFAULT_ACL = "public-read"
-AWS_QUERYSTRING_AUTH = False
+AWS_S3_REGION_NAME = os.environ.get("AWS_REGION")
+
+AWS_S3_ENDPOINT_URL = os.environ.get("AWS_S3_ENDPOINT_URL") or os.environ.get("MINIO_ENDPOINT_URL")
+AWS_S3_SIGNATURE_VERSION = "s3v4"
+AWS_S3_ADDRESSING_STYLE = "path"
+
 AWS_S3_FILE_OVERWRITE = False
-AWS_S3_ENDPOINT_URL = os.environ.get("AWS_S3_ENDPOINT_URL", None) or os.environ.get("MINIO_ENDPOINT_URL", None)
-if AWS_S3_ENDPOINT_URL and USE_MINIO:
+AWS_DEFAULT_ACL = None
+AWS_QUERYSTRING_AUTH = True
+AWS_S3_OBJECT_PARAMETERS = {
+    "CacheControl": "max-age=86400",
+}
+
+AWS_S3_CUSTOM_DOMAIN = os.environ.get("AWS_S3_CUSTOM_DOMAIN")
+if AWS_S3_ENDPOINT_URL and USE_MINIO and not AWS_S3_CUSTOM_DOMAIN:
     parsed_url = urlparse(os.environ.get("WEB_URL", "http://localhost"))
     AWS_S3_CUSTOM_DOMAIN = f"{parsed_url.netloc}/{AWS_STORAGE_BUCKET_NAME}"
     AWS_S3_URL_PROTOCOL = f"{parsed_url.scheme}:"
@@ -259,11 +271,48 @@ RABBITMQ_PASSWORD = os.environ.get("RABBITMQ_PASSWORD", "guest")
 RABBITMQ_VHOST = os.environ.get("RABBITMQ_VHOST", "/")
 AMQP_URL = os.environ.get("AMQP_URL")
 
-# Celery Configuration
-if AMQP_URL:
-    CELERY_BROKER_URL = AMQP_URL
+# ===================
+# Celery Configuration (Optimized for Free Tier)
+# ===================
+REDIS_BROKER_URL = os.environ.get("REDIS_URL")
+
+if REDIS_BROKER_URL:
+    CELERY_BROKER_URL = REDIS_BROKER_URL
+    CELERY_RESULT_BACKEND = REDIS_BROKER_URL
+
+    if CELERY_BROKER_URL.startswith("rediss://"):
+        CELERY_BROKER_USE_SSL = {"ssl_cert_reqs": ssl.CERT_NONE}
+        CELERY_REDIS_BACKEND_USE_SSL = {"ssl_cert_reqs": ssl.CERT_NONE}
 else:
-    CELERY_BROKER_URL = f"amqp://{RABBITMQ_USER}:{RABBITMQ_PASSWORD}@{RABBITMQ_HOST}:{RABBITMQ_PORT}/{RABBITMQ_VHOST}"
+    if AMQP_URL:
+        CELERY_BROKER_URL = AMQP_URL
+    else:
+        CELERY_BROKER_URL = (
+            f"amqp://{RABBITMQ_USER}:{RABBITMQ_PASSWORD}@{RABBITMQ_HOST}:{RABBITMQ_PORT}/{RABBITMQ_VHOST}"
+        )
+
+CELERY_BROKER_POOL_LIMIT = 1
+CELERY_BROKER_CONNECTION_MAX_RETRIES = 3
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+CELERY_WORKER_CONCURRENCY = int(os.environ.get("CELERY_WORKER_CONCURRENCY", "2"))
+CELERY_TASK_ACKS_LATE = True
+
+CELERY_RESULT_EXPIRES = 3600
+CELERY_BROKER_HEARTBEAT = 0
+CELERY_EVENT_QUEUE_EXPIRES = 60
+CELERY_EVENT_QUEUE_TTL = 5
+# Celery Configuration - Use Redis as broker (Upstash compatible)
+CELERY_BROKER_URL = os.environ.get("REDIS_URL") or os.environ.get("CELERY_BROKER_URL") or REDIS_URL
+CELERY_RESULT_BACKEND = os.environ.get("REDIS_URL") or os.environ.get("CELERY_RESULT_BACKEND") or REDIS_URL
+
+CELERY_BROKER_USE_SSL = {"ssl_cert_reqs": ssl.CERT_NONE} if REDIS_URL.startswith("rediss://") else None
+CELERY_REDIS_BACKEND_USE_SSL = CELERY_BROKER_USE_SSL
+
+CELERY_BROKER_POOL_LIMIT = 1
+CELERY_BROKER_CONNECTION_MAX_RETRIES = 5
+CELERY_TASK_ACKS_LATE = True
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_SERIALIZER = "json"
@@ -272,16 +321,14 @@ CELERY_ACCEPT_CONTENT = ["application/json"]
 
 
 CELERY_IMPORTS = (
-    # scheduled tasks
     "plane.bgtasks.issue_automation_task",
     "plane.bgtasks.exporter_expired_task",
     "plane.bgtasks.file_asset_task",
     "plane.bgtasks.email_notification_task",
     "plane.bgtasks.cleanup_task",
     "plane.license.bgtasks.tracer",
-    # management tasks
+    "plane.bgtasks.health",
     "plane.bgtasks.dummy_data_task",
-    # issue version tasks
     "plane.bgtasks.issue_version_sync",
     "plane.bgtasks.issue_description_version_sync",
 )
