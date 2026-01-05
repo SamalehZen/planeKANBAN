@@ -252,6 +252,45 @@ if AWS_S3_ENDPOINT_URL and USE_MINIO:
     AWS_S3_CUSTOM_DOMAIN = f"{parsed_url.netloc}/{AWS_STORAGE_BUCKET_NAME}"
     AWS_S3_URL_PROTOCOL = f"{parsed_url.scheme}:"
 
+# RabbitMQ connection settings
+RABBITMQ_HOST = os.environ.get("RABBITMQ_HOST", "localhost")
+RABBITMQ_PORT = os.environ.get("RABBITMQ_PORT", "5672")
+RABBITMQ_USER = os.environ.get("RABBITMQ_USER", "guest")
+RABBITMQ_PASSWORD = os.environ.get("RABBITMQ_PASSWORD", "guest")
+RABBITMQ_VHOST = os.environ.get("RABBITMQ_VHOST", "/")
+AMQP_URL = os.environ.get("AMQP_URL")
+
+# ===================
+# Celery Configuration (Optimized for Free Tier)
+# ===================
+REDIS_BROKER_URL = os.environ.get("REDIS_URL")
+
+if REDIS_BROKER_URL:
+    CELERY_BROKER_URL = REDIS_BROKER_URL
+    CELERY_RESULT_BACKEND = REDIS_BROKER_URL
+
+    if CELERY_BROKER_URL.startswith("rediss://"):
+        CELERY_BROKER_USE_SSL = {"ssl_cert_reqs": ssl.CERT_NONE}
+        CELERY_REDIS_BACKEND_USE_SSL = {"ssl_cert_reqs": ssl.CERT_NONE}
+else:
+    if AMQP_URL:
+        CELERY_BROKER_URL = AMQP_URL
+    else:
+        CELERY_BROKER_URL = (
+            f"amqp://{RABBITMQ_USER}:{RABBITMQ_PASSWORD}@{RABBITMQ_HOST}:{RABBITMQ_PORT}/{RABBITMQ_VHOST}"
+        )
+
+CELERY_BROKER_POOL_LIMIT = 1
+CELERY_BROKER_CONNECTION_MAX_RETRIES = 3
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+CELERY_WORKER_CONCURRENCY = int(os.environ.get("CELERY_WORKER_CONCURRENCY", "2"))
+CELERY_TASK_ACKS_LATE = True
+
+CELERY_RESULT_EXPIRES = 3600
+CELERY_BROKER_HEARTBEAT = 0
+CELERY_EVENT_QUEUE_EXPIRES = 60
+CELERY_EVENT_QUEUE_TTL = 5
 # Celery Configuration - Use Redis as broker (Upstash compatible)
 CELERY_BROKER_URL = os.environ.get("REDIS_URL") or os.environ.get("CELERY_BROKER_URL") or REDIS_URL
 CELERY_RESULT_BACKEND = os.environ.get("REDIS_URL") or os.environ.get("CELERY_RESULT_BACKEND") or REDIS_URL
@@ -271,16 +310,14 @@ CELERY_ACCEPT_CONTENT = ["application/json"]
 
 
 CELERY_IMPORTS = (
-    # scheduled tasks
     "plane.bgtasks.issue_automation_task",
     "plane.bgtasks.exporter_expired_task",
     "plane.bgtasks.file_asset_task",
     "plane.bgtasks.email_notification_task",
     "plane.bgtasks.cleanup_task",
     "plane.license.bgtasks.tracer",
-    # management tasks
+    "plane.bgtasks.health",
     "plane.bgtasks.dummy_data_task",
-    # issue version tasks
     "plane.bgtasks.issue_version_sync",
     "plane.bgtasks.issue_description_version_sync",
 )

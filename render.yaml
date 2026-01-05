@@ -1,4 +1,15 @@
 services:
+  - type: worker
+    name: plane-worker
+    runtime: python
+    region: frankfurt
+    plan: free
+    buildCommand: |
+      cd apps/api
+      pip install -r requirements.txt
+    startCommand: |
+      cd apps/api
+      ./bin/docker-entrypoint-worker-render.sh
   # Web App (React)
   - type: web
     name: plane-web
@@ -70,6 +81,8 @@ services:
         sync: false
       - key: REDIS_URL
         sync: false
+      - key: DJANGO_SETTINGS_MODULE
+        value: plane.settings.production
       - key: SECRET_KEY
         generateValue: true
       - key: DJANGO_SETTINGS_MODULE
