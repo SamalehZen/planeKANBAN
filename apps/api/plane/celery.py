@@ -1,22 +1,20 @@
-# Python imports
+
 import logging
 import os
 import ssl
 
-# Third party imports
 from celery import Celery
 from celery.schedules import crontab
 from celery.signals import after_setup_logger, after_setup_task_logger
 from pythonjsonlogger.jsonlogger import JsonFormatter
-
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "plane.settings.production")
 
 app = Celery("plane")
 app.config_from_object("django.conf:settings", namespace="CELERY")
 
+redis_url = os.environ.get("REDIS_URL") or os.environ.get("CELERY_BROKER_URL") or ""
 
-redis_url = os.environ.get("REDIS_URL") or ""
 if redis_url.startswith("rediss://"):
     app.conf.broker_use_ssl = {"ssl_cert_reqs": ssl.CERT_NONE}
     app.conf.redis_backend_use_ssl = {"ssl_cert_reqs": ssl.CERT_NONE}

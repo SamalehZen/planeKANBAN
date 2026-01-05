@@ -139,8 +139,17 @@ AUTH_USER_MODEL = "db.User"
 
 # Database
 if bool(os.environ.get("DATABASE_URL")):
-    # Parse database configuration from $DATABASE_URL
-    DATABASES = {"default": dj_database_url.config()}
+    DATABASES = {
+        "default": dj_database_url.config(
+            default=os.environ.get("DATABASE_URL"),
+            conn_max_age=600,
+            conn_health_checks=True,
+            ssl_require=True,
+        )
+    }
+
+    DATABASES["default"]["CONN_MAX_AGE"] = 60
+    DATABASES["default"]["OPTIONS"] = {"sslmode": "require"}
 else:
     DATABASES = {
         "default": {
@@ -175,28 +184,19 @@ if os.environ.get("ENABLE_READ_REPLICA", "0") == "1":
 
 
 # Redis Config
-REDIS_URL = os.environ.get("REDIS_URL")
-REDIS_SSL = REDIS_URL and "rediss" in REDIS_URL
+REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
+REDIS_SSL = REDIS_URL.startswith("rediss://")
 
-if REDIS_SSL:
-    CACHES = {
-        "default": {
-            "BACKEND": "django_redis.cache.RedisCache",
-            "LOCATION": REDIS_URL,
-            "OPTIONS": {
-                "CLIENT_CLASS": "django_redis.client.DefaultClient",
-                "CONNECTION_POOL_KWARGS": {"ssl_cert_reqs": False},
-            },
-        }
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": REDIS_URL,
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            "CONNECTION_POOL_KWARGS": {"ssl_cert_reqs": None} if REDIS_SSL else {},
+        },
     }
-else:
-    CACHES = {
-        "default": {
-            "BACKEND": "django_redis.cache.RedisCache",
-            "LOCATION": REDIS_URL,
-            "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
-        }
-    }
+}
 
 # Password validations
 AUTH_PASSWORD_VALIDATORS = [
@@ -291,6 +291,17 @@ CELERY_RESULT_EXPIRES = 3600
 CELERY_BROKER_HEARTBEAT = 0
 CELERY_EVENT_QUEUE_EXPIRES = 60
 CELERY_EVENT_QUEUE_TTL = 5
+# Celery Configuration - Use Redis as broker (Upstash compatible)
+CELERY_BROKER_URL = os.environ.get("REDIS_URL") or os.environ.get("CELERY_BROKER_URL") or REDIS_URL
+CELERY_RESULT_BACKEND = os.environ.get("REDIS_URL") or os.environ.get("CELERY_RESULT_BACKEND") or REDIS_URL
+
+CELERY_BROKER_USE_SSL = {"ssl_cert_reqs": ssl.CERT_NONE} if REDIS_URL.startswith("rediss://") else None
+CELERY_REDIS_BACKEND_USE_SSL = CELERY_BROKER_USE_SSL
+
+CELERY_BROKER_POOL_LIMIT = 1
+CELERY_BROKER_CONNECTION_MAX_RETRIES = 5
+CELERY_TASK_ACKS_LATE = True
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_SERIALIZER = "json"
