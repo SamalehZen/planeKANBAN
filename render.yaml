@@ -1,0 +1,22 @@
+envVarGroups:
+  - name: plane-shared
+    envVars:
+      - key: NEXT_PUBLIC_API_BASE_URL
+        value: https://plane-api.onrender.com
+      - key: NEXT_PUBLIC_LIVE_BASE_URL
+        value: https://plane-live.onrender.com
+      - key: NEXT_PUBLIC_SPACE_BASE_URL
+        value: https://plane-space.onrender.com
+      - key: NEXT_PUBLIC_ADMIN_BASE_URL
+        value: https://plane-admin.onrender.com
+      - key: NEXT_PUBLIC_WEB_BASE_URL
+        value: https://plane-web.onrender.com
+
+services:
+  - type: web
+    name: plane-web
+    # ... existing config ...
+    envVars:
+      - fromGroup: plane-shared
+      - key: NODE_ENV
+        value: production

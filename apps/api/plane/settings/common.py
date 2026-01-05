@@ -328,20 +328,20 @@ CSRF_FAILURE_VIEW = "plane.authentication.views.common.csrf_failure"
 
 ######  Base URLs ######
 
-# Admin Base URL
-ADMIN_BASE_URL = os.environ.get("ADMIN_BASE_URL", None)
+admin_url_alias = os.environ.get("ADMIN_URL", None)
+ADMIN_BASE_URL = os.environ.get("ADMIN_BASE_URL", None) or admin_url_alias
 if ADMIN_BASE_URL and not is_valid_url(ADMIN_BASE_URL):
     ADMIN_BASE_URL = None
-ADMIN_BASE_PATH = os.environ.get("ADMIN_BASE_PATH", "/god-mode/")
+ADMIN_BASE_PATH = os.environ.get("ADMIN_BASE_PATH") or ("/" if admin_url_alias else "/god-mode/")
 
-# Space Base URL
-SPACE_BASE_URL = os.environ.get("SPACE_BASE_URL", None)
+space_url_alias = os.environ.get("SPACE_URL", None)
+SPACE_BASE_URL = os.environ.get("SPACE_BASE_URL", None) or space_url_alias
 if SPACE_BASE_URL and not is_valid_url(SPACE_BASE_URL):
     SPACE_BASE_URL = None
-SPACE_BASE_PATH = os.environ.get("SPACE_BASE_PATH", "/spaces/")
+SPACE_BASE_PATH = os.environ.get("SPACE_BASE_PATH") or ("/" if space_url_alias else "/spaces/")
 
-# App Base URL
-APP_BASE_URL = os.environ.get("APP_BASE_URL", None)
+web_url_alias = os.environ.get("WEB_URL", None)
+APP_BASE_URL = os.environ.get("APP_BASE_URL", None) or web_url_alias
 if APP_BASE_URL and not is_valid_url(APP_BASE_URL):
     APP_BASE_URL = None
 APP_BASE_PATH = os.environ.get("APP_BASE_PATH", "/")
@@ -355,7 +355,7 @@ LIVE_BASE_PATH = os.environ.get("LIVE_BASE_PATH", "/live/")
 LIVE_URL = urljoin(LIVE_BASE_URL, LIVE_BASE_PATH) if LIVE_BASE_URL else None
 
 # WEB URL
-WEB_URL = os.environ.get("WEB_URL")
+WEB_URL = web_url_alias
 
 HARD_DELETE_AFTER_DAYS = int(os.environ.get("HARD_DELETE_AFTER_DAYS", 60))
 
