@@ -272,24 +272,21 @@ RABBITMQ_VHOST = os.environ.get("RABBITMQ_VHOST", "/")
 AMQP_URL = os.environ.get("AMQP_URL")
 
 # ===================
-# Celery Configuration (Optimized for Free Tier)
+# Celery (Render / Free Tier defaults)
 # ===================
-REDIS_BROKER_URL = os.environ.get("REDIS_URL")
+redis_url = os.environ.get("REDIS_URL", REDIS_URL)
 
-if REDIS_BROKER_URL:
-    CELERY_BROKER_URL = REDIS_BROKER_URL
-    CELERY_RESULT_BACKEND = REDIS_BROKER_URL
+CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL") or redis_url or AMQP_URL or (
+    f"amqp://{RABBITMQ_USER}:{RABBITMQ_PASSWORD}@{RABBITMQ_HOST}:{RABBITMQ_PORT}/{RABBITMQ_VHOST}"
+)
+CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND") or redis_url
 
-    if CELERY_BROKER_URL.startswith("rediss://"):
-        CELERY_BROKER_USE_SSL = {"ssl_cert_reqs": ssl.CERT_NONE}
-        CELERY_REDIS_BACKEND_USE_SSL = {"ssl_cert_reqs": ssl.CERT_NONE}
+if CELERY_BROKER_URL.startswith("rediss://"):
+    CELERY_BROKER_USE_SSL = {"ssl_cert_reqs": ssl.CERT_NONE}
+    CELERY_REDIS_BACKEND_USE_SSL = {"ssl_cert_reqs": ssl.CERT_NONE}
 else:
-    if AMQP_URL:
-        CELERY_BROKER_URL = AMQP_URL
-    else:
-        CELERY_BROKER_URL = (
-            f"amqp://{RABBITMQ_USER}:{RABBITMQ_PASSWORD}@{RABBITMQ_HOST}:{RABBITMQ_PORT}/{RABBITMQ_VHOST}"
-        )
+    CELERY_BROKER_USE_SSL = None
+    CELERY_REDIS_BACKEND_USE_SSL = None
 
 CELERY_BROKER_POOL_LIMIT = 1
 CELERY_BROKER_CONNECTION_MAX_RETRIES = 3
@@ -302,17 +299,6 @@ CELERY_RESULT_EXPIRES = 3600
 CELERY_BROKER_HEARTBEAT = 0
 CELERY_EVENT_QUEUE_EXPIRES = 60
 CELERY_EVENT_QUEUE_TTL = 5
-# Celery Configuration - Use Redis as broker (Upstash compatible)
-CELERY_BROKER_URL = os.environ.get("REDIS_URL") or os.environ.get("CELERY_BROKER_URL") or REDIS_URL
-CELERY_RESULT_BACKEND = os.environ.get("REDIS_URL") or os.environ.get("CELERY_RESULT_BACKEND") or REDIS_URL
-
-CELERY_BROKER_USE_SSL = {"ssl_cert_reqs": ssl.CERT_NONE} if REDIS_URL.startswith("rediss://") else None
-CELERY_REDIS_BACKEND_USE_SSL = CELERY_BROKER_USE_SSL
-
-CELERY_BROKER_POOL_LIMIT = 1
-CELERY_BROKER_CONNECTION_MAX_RETRIES = 5
-CELERY_TASK_ACKS_LATE = True
-CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_SERIALIZER = "json"
