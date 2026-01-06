@@ -1,5 +1,47 @@
 envVarGroups:
-  - name: plane-shared
+  - name: plane-runtime
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_S3_ENDPOINT_URL
+        sync: false
+      - key: AWS_S3_BUCKET_NAME
+        value: plane-uploads
+      - key: AWS_REGION
+        value: auto
+      - key: AWS_S3_CUSTOM_DOMAIN
+        sync: false
+
+  - name: plane-secrets
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: LIVE_SERVER_SECRET_KEY
+        generateValue: true
+
+  - name: plane-urls
+    envVars:
+      - key: WEB_URL
+        value: https://plane-web.onrender.com
+      - key: ADMIN_URL
+        value: https://plane-admin.onrender.com
+      - key: SPACE_URL
+        value: https://plane-space.onrender.com
+      - key: LIVE_BASE_URL
+        value: https://plane-live.onrender.com
+
+  - name: plane-cors
+    envVars:
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://plane-web.onrender.com,https://plane-admin.onrender.com,https://plane-space.onrender.com
+
+  - name: plane-client
     envVars:
       - key: NEXT_PUBLIC_API_BASE_URL
         value: https://plane-api.onrender.com
@@ -14,112 +56,103 @@ envVarGroups:
 
 services:
   - type: web
-    name: plane-web
-    # ... existing config ...
+    name: plane-api
+    env: python
+    region: frankfurt
+    plan: free
+    buildCommand: cd apps/api && pip install -r requirements.txt
+    startCommand: cd apps/api && ./bin/docker-entrypoint-api.sh
     envVars:
-      - fromGroup: plane-shared
-      - key: NODE_ENV
-        value: production
-services:
+      - fromGroup: plane-runtime
+      - fromGroup: plane-secrets
+      - fromGroup: plane-urls
+      - fromGroup: plane-cors
+      - key: DJANGO_SETTINGS_MODULE
+        value: plane.settings.production
+      - key: PYTHON_VERSION
+        value: 3.10.13
+      - key: DEBUG
+        value: "0"
+      - key: GUNICORN_WORKERS
+        value: "2"
+
   - type: worker
     name: plane-worker
-    runtime: python
+    env: python
     region: frankfurt
     plan: free
-    buildCommand: |
-      cd apps/api
-      pip install -r requirements.txt
-    startCommand: |
-      cd apps/api
-      ./bin/docker-entrypoint-worker-render.sh
-  # Web App (React)
-  - type: web
-    name: plane-web
-    runtime: node
-    region: frankfurt
-    plan: free
-    buildCommand: cd apps/web && pnpm install && pnpm build
-    startCommand: cd apps/web && pnpm start
+    buildCommand: cd apps/api && pip install -r requirements.txt
+    startCommand: cd apps/api && ./bin/docker-entrypoint-worker-render.sh
     envVars:
-      - key: NODE_ENV
-        value: production
-      - key: NEXT_PUBLIC_API_BASE_URL
-        sync: false
-      - key: NEXT_PUBLIC_ADMIN_BASE_URL
-        sync: false
-      - key: NEXT_PUBLIC_SPACE_BASE_URL
-        sync: false
-      - key: NEXT_PUBLIC_LIVE_BASE_URL
-        sync: false
+      - fromGroup: plane-runtime
+      - fromGroup: plane-secrets
+      - fromGroup: plane-urls
+      - fromGroup: plane-cors
+      - key: DJANGO_SETTINGS_MODULE
+        value: plane.settings.production
+      - key: PYTHON_VERSION
+        value: 3.10.13
+      - key: DEBUG
+        value: "0"
 
-  # Admin Panel (God Mode)
-  - type: web
-    name: plane-admin
-    runtime: node
-    region: frankfurt
-    plan: free
-    buildCommand: cd apps/admin && pnpm install && pnpm build
-    startCommand: cd apps/admin && pnpm start
-    envVars:
-      - key: NODE_ENV
-        value: production
-
-  # Space (Public Pages)
-  - type: web
-    name: plane-space
-    runtime: node
-    region: frankfurt
-    plan: free
-    buildCommand: cd apps/space && pnpm install && pnpm build
-    startCommand: cd apps/space && pnpm start
-    envVars:
-      - key: NODE_ENV
-        value: production
-
-  # Live Collaboration (WebSocket)
   - type: web
     name: plane-live
-    runtime: node
+    env: node
     region: frankfurt
     plan: free
-    buildCommand: cd apps/live && pnpm install && pnpm build
-    startCommand: cd apps/live && pnpm start
+    buildCommand: corepack enable && corepack prepare pnpm@10.24.0 --activate && pnpm install --frozen-lockfile && pnpm --filter live build
+    startCommand: node apps/live/dist/start.mjs
     envVars:
+      - fromGroup: plane-runtime
+      - fromGroup: plane-secrets
+      - fromGroup: plane-cors
+      - key: NODE_VERSION
+        value: 22.18.0
+      - key: API_BASE_URL
+        value: https://plane-api.onrender.com
+
+  - type: web
+    name: plane-space
+    env: node
+    region: frankfurt
+    plan: free
+    buildCommand: corepack enable && corepack prepare pnpm@10.24.0 --activate && pnpm install --frozen-lockfile && pnpm --filter space build
+    startCommand: PORT=$PORT ./node_modules/.bin/react-router-serve ./apps/space/build/server/index.js
+    envVars:
+      - fromGroup: plane-client
+      - key: NODE_VERSION
+        value: 22.18.0
       - key: NODE_ENV
         value: production
-      - key: REDIS_URL
-        sync: false
 
-  # API Backend (Django)
   - type: web
-    name: plane-api
-    runtime: python
+    name: plane-web
+    env: static
     region: frankfurt
     plan: free
-    buildCommand: cd apps/api && pip install -r requirements.txt
-    startCommand: cd apps/api && gunicorn plane.wsgi:application --bind 0.0.0.0:$PORT
+    buildCommand: corepack enable && corepack prepare pnpm@10.24.0 --activate && pnpm install --frozen-lockfile && pnpm --filter web build
+    staticPublishPath: apps/web/build/client
     envVars:
-      - key: DATABASE_URL
-        sync: false
-      - key: REDIS_URL
-        sync: false
-      - key: DJANGO_SETTINGS_MODULE
-        value: plane.settings.production
-      - key: SECRET_KEY
-        generateValue: true
-      - key: DJANGO_SETTINGS_MODULE
-        value: plane.settings.production
+      - fromGroup: plane-client
+      - key: NODE_VERSION
+        value: 22.18.0
+    routes:
+      - type: rewrite
+        source: "/*"
+        destination: /index.html
 
-  # Background Worker (Celery)
-  - type: worker
-    name: plane-worker
-    runtime: python
+  - type: web
+    name: plane-admin
+    env: static
     region: frankfurt
     plan: free
-    buildCommand: cd apps/api && pip install -r requirements.txt
-    startCommand: cd apps/api && celery -A plane worker -l info -B --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    buildCommand: corepack enable && corepack prepare pnpm@10.24.0 --activate && pnpm install --frozen-lockfile && pnpm --filter admin build
+    staticPublishPath: apps/admin/build/client
     envVars:
-      - key: DATABASE_URL
-        sync: false
-      - key: REDIS_URL
-        sync: false
+      - fromGroup: plane-client
+      - key: NODE_VERSION
+        value: 22.18.0
+    routes:
+      - type: rewrite
+        source: "/*"
+        destination: /index.html
