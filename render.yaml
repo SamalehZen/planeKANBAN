@@ -142,7 +142,6 @@ services:
   - type: web
     name: plane-admin
     env: static
-    plan: free
     buildCommand: corepack enable && corepack prepare pnpm@10.24.0 --activate && pnpm install --frozen-lockfile && pnpm --filter admin build
     staticPublishPath: apps/admin/build/client
     envVars:
