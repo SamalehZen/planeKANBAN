@@ -7,8 +7,8 @@
   "type": "module",
   "scripts": {
     "dev": "react-router dev --port 3001",
-    "build": "react-router build",
-    "preview": "react-router build && serve -s build/client -l 3001",
+    "build": "node ../../tools/ensure-plane-packages-built.mjs admin && react-router build",
+    "preview": "pnpm run build && serve -s build/client -l 3001",
     "start": "serve -s build/client -l 3001",
     "clean": "rm -rf .turbo && rm -rf .next && rm -rf node_modules && rm -rf dist && rm -rf build",
     "check:lint": "eslint . --cache --cache-location node_modules/.cache/eslint/ --max-warnings=485",

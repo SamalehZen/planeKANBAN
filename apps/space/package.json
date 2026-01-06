@@ -6,8 +6,8 @@
   "type": "module",
   "scripts": {
     "dev": "react-router dev --port 3002",
-    "build": "react-router build",
-    "preview": "react-router build && PORT=3002 react-router-serve ./build/server/index.js",
+    "build": "node ../../tools/ensure-plane-packages-built.mjs space && react-router build",
+    "preview": "pnpm run build && PORT=3002 react-router-serve ./build/server/index.js",
     "start": "PORT=3002 react-router-serve ./build/server/index.js",
     "clean": "rm -rf .turbo && rm -rf .next && rm -rf .react-router && rm -rf node_modules && rm -rf dist && rm -rf build",
     "check:lint": "eslint . --cache --cache-location node_modules/.cache/eslint/ --max-warnings=932",
