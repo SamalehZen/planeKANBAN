@@ -1,3 +1,4 @@
+export { setGlobalAuthTokenGetter } from "./api.service";
 export * from "./ai";
 export * from "./developer";
 export * from "./auth";

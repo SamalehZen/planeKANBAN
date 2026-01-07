@@ -1,6 +1,13 @@
 import type { AxiosInstance, AxiosRequestConfig } from "axios";
 import axios from "axios";
 
+type AuthTokenGetter = () => string | null;
+let globalAuthTokenGetter: AuthTokenGetter | null = null;
+
+export const setGlobalAuthTokenGetter = (getter: AuthTokenGetter) => {
+  globalAuthTokenGetter = getter;
+};
+
 /**
  * Abstract base class for making HTTP requests using axios
  * @abstract
@@ -18,6 +25,15 @@ export abstract class APIService {
     this.axiosInstance = axios.create({
       baseURL,
       withCredentials: true,
+    });
+    this.axiosInstance.interceptors.request.use((config) => {
+      if (globalAuthTokenGetter) {
+        const token = globalAuthTokenGetter();
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
+      }
+      return config;
     });
   }
 
