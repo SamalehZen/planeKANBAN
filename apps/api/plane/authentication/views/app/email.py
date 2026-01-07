@@ -3,6 +3,8 @@ from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.http import HttpResponseRedirect
 from django.views import View
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
 
 # Module imports
 from plane.authentication.provider.credentials.email import EmailProvider
@@ -19,6 +21,7 @@ from plane.authentication.adapter.error import (
 from plane.utils.path_validator import get_safe_redirect_url
 
 
+@method_decorator(csrf_exempt, name="dispatch")
 class SignInAuthEndpoint(View):
     def post(self, request):
         next_path = request.POST.get("next_path")
@@ -128,6 +131,7 @@ class SignInAuthEndpoint(View):
             return HttpResponseRedirect(url)
 
 
+@method_decorator(csrf_exempt, name="dispatch")
 class SignUpAuthEndpoint(View):
     def post(self, request):
         next_path = request.POST.get("next_path")

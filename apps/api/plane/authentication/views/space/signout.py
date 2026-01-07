@@ -1,5 +1,7 @@
 # Django imports
 from django.views import View
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
 from django.contrib.auth import logout
 from django.http import HttpResponseRedirect
 from django.utils import timezone
@@ -10,6 +12,7 @@ from plane.db.models import User
 from plane.utils.path_validator import get_safe_redirect_url
 
 
+@method_decorator(csrf_exempt, name="dispatch")
 class SignOutAuthSpaceEndpoint(View):
     def post(self, request):
         next_path = request.POST.get("next_path")

@@ -2,6 +2,8 @@
 from django.core.validators import validate_email
 from django.http import HttpResponseRedirect
 from django.views import View
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
 
 # Third party imports
 from rest_framework import status
@@ -54,6 +56,7 @@ class MagicGenerateEndpoint(APIView):
             return Response(params, status=status.HTTP_400_BAD_REQUEST)
 
 
+@method_decorator(csrf_exempt, name="dispatch")
 class MagicSignInEndpoint(View):
     def post(self, request):
         # set the referer as session to redirect after login
@@ -125,6 +128,7 @@ class MagicSignInEndpoint(View):
             return HttpResponseRedirect(url)
 
 
+@method_decorator(csrf_exempt, name="dispatch")
 class MagicSignUpEndpoint(View):
     def post(self, request):
         # set the referer as session to redirect after login
