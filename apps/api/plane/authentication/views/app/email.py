@@ -18,6 +18,7 @@ from plane.authentication.adapter.error import (
     AuthenticationException,
     AUTHENTICATION_ERROR_CODES,
 )
+from plane.authentication.utils.auth_token import generate_auth_token
 from plane.utils.path_validator import get_safe_redirect_url
 
 
@@ -108,6 +109,8 @@ class SignInAuthEndpoint(View):
             user = provider.authenticate()
             # Login the user and record his device info
             user_login(request=request, user=user, is_app=True)
+            # Generate auth token for cross-origin authentication
+            auth_token = generate_auth_token(user.id)
             # Get the redirection path
             if next_path:
                 path = next_path
@@ -118,7 +121,7 @@ class SignInAuthEndpoint(View):
             url = get_safe_redirect_url(
                 base_url=base_host(request=request, is_app=True),
                 next_path=path,
-                params={},
+                params={"auth_token": auth_token},
             )
             return HttpResponseRedirect(url)
         except AuthenticationException as e:
@@ -216,6 +219,8 @@ class SignUpAuthEndpoint(View):
             user = provider.authenticate()
             # Login the user and record his device info
             user_login(request=request, user=user, is_app=True)
+            # Generate auth token for cross-origin authentication
+            auth_token = generate_auth_token(user.id)
             # Get the redirection path
             if next_path:
                 path = next_path
@@ -225,7 +230,7 @@ class SignUpAuthEndpoint(View):
             url = get_safe_redirect_url(
                 base_url=base_host(request=request, is_app=True),
                 next_path=path,
-                params={},
+                params={"auth_token": auth_token},
             )
             return HttpResponseRedirect(url)
         except AuthenticationException as e:
