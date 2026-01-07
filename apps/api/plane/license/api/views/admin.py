@@ -6,6 +6,8 @@ from zxcvbn import zxcvbn
 # Django imports
 from django.http import HttpResponseRedirect
 from django.views import View
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 from django.utils import timezone
@@ -82,6 +84,7 @@ class InstanceAdminEndpoint(BaseAPIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+@method_decorator(csrf_exempt, name="dispatch")
 class InstanceAdminSignUpEndpoint(View):
     permission_classes = [AllowAny]
 
@@ -235,6 +238,7 @@ class InstanceAdminSignUpEndpoint(View):
             return HttpResponseRedirect(url)
 
 
+@method_decorator(csrf_exempt, name="dispatch")
 class InstanceAdminSignInEndpoint(View):
     permission_classes = [AllowAny]
 
