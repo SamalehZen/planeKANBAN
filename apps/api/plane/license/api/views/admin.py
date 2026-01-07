@@ -6,6 +6,8 @@ from zxcvbn import zxcvbn
 # Django imports
 from django.http import HttpResponseRedirect
 from django.views import View
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 from django.utils import timezone
@@ -35,6 +37,7 @@ from plane.authentication.adapter.error import (
 )
 from plane.utils.ip_address import get_client_ip
 from plane.utils.path_validator import get_safe_redirect_url
+from plane.license.utils.admin_token import generate_admin_token
 
 
 class InstanceAdminEndpoint(BaseAPIView):
@@ -82,6 +85,7 @@ class InstanceAdminEndpoint(BaseAPIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+@method_decorator(csrf_exempt, name="dispatch")
 class InstanceAdminSignUpEndpoint(View):
     permission_classes = [AllowAny]
 
@@ -231,10 +235,14 @@ class InstanceAdminSignUpEndpoint(View):
 
             # get tokens for user
             user_login(request=request, user=user, is_admin=True)
-            url = urljoin(base_host(request=request, is_admin=True), "general/")
+            # Generate admin auth token for cross-origin authentication
+            admin_token = generate_admin_token(user.id)
+            base_url = base_host(request=request, is_admin=True)
+            url = urljoin(base_url, f"general/?auth_token={admin_token}")
             return HttpResponseRedirect(url)
 
 
+@method_decorator(csrf_exempt, name="dispatch")
 class InstanceAdminSignInEndpoint(View):
     permission_classes = [AllowAny]
 
@@ -350,7 +358,10 @@ class InstanceAdminSignInEndpoint(View):
 
         # get tokens for user
         user_login(request=request, user=user, is_admin=True)
-        url = urljoin(base_host(request=request, is_admin=True), "general/")
+        # Generate admin auth token for cross-origin authentication
+        admin_token = generate_admin_token(user.id)
+        base_url = base_host(request=request, is_admin=True)
+        url = urljoin(base_url, f"general/?auth_token={admin_token}")
         return HttpResponseRedirect(url)
 
 

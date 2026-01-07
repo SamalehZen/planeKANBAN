@@ -4,6 +4,7 @@ import { AppProgressBar } from "@/lib/b-progress";
 import { InstanceProvider } from "./(all)/instance.provider";
 import { StoreProvider } from "./(all)/store.provider";
 import { ToastWithTheme } from "./(all)/toast";
+import { TokenProvider } from "./(all)/token.provider";
 import { UserProvider } from "./(all)/user.provider";
 
 const DEFAULT_SWR_CONFIG = {
@@ -20,13 +21,15 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     <ThemeProvider themes={["light", "dark"]} defaultTheme="system" enableSystem>
       <AppProgressBar />
       <ToastWithTheme />
-      <SWRConfig value={DEFAULT_SWR_CONFIG}>
-        <StoreProvider>
-          <InstanceProvider>
-            <UserProvider>{children}</UserProvider>
-          </InstanceProvider>
-        </StoreProvider>
-      </SWRConfig>
+      <TokenProvider>
+        <SWRConfig value={DEFAULT_SWR_CONFIG}>
+          <StoreProvider>
+            <InstanceProvider>
+              <UserProvider>{children}</UserProvider>
+            </InstanceProvider>
+          </StoreProvider>
+        </SWRConfig>
+      </TokenProvider>
     </ThemeProvider>
   );
 }

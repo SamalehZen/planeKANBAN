@@ -6,6 +6,8 @@ import { AuthService, UserService } from "@plane/services";
 import type { IUser } from "@plane/types";
 // root store
 import type { CoreRootStore } from "@/store/root.store";
+// utils
+import { removeAdminToken } from "@/utils/admin-token";
 
 export interface IUserStore {
   // observables
@@ -98,6 +100,7 @@ export class UserStore implements IUserStore {
   };
 
   signOut = async () => {
+    removeAdminToken();
     this.store.resetOnSignOut();
   };
 }

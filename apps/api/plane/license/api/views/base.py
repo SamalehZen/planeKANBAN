@@ -16,6 +16,7 @@ from rest_framework.views import APIView
 
 # Module imports
 from plane.license.api.permissions import InstanceAdminPermission
+from plane.license.api.authentication import AdminTokenAuthentication
 from plane.authentication.session import BaseSessionAuthentication
 from plane.utils.exception_logger import log_exception
 from plane.utils.paginator import BasePaginator
@@ -40,7 +41,7 @@ class BaseAPIView(TimezoneMixin, APIView, BasePaginator):
 
     filter_backends = (DjangoFilterBackend, SearchFilter)
 
-    authentication_classes = [BaseSessionAuthentication]
+    authentication_classes = [AdminTokenAuthentication, BaseSessionAuthentication]
 
     filterset_fields = []
 
