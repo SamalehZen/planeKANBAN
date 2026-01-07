@@ -13,6 +13,8 @@ import "@/lib/polyfills";
 import { AppProgressBar } from "@/lib/b-progress";
 // mobx store provider
 import { StoreProvider } from "@/lib/store-context";
+// token provider for cross-origin auth
+import { TokenProvider } from "@/lib/token-provider";
 // wrappers
 import { InstanceWrapper } from "@/lib/wrappers/instance-wrapper";
 
@@ -42,23 +44,25 @@ export function AppProvider(props: IAppProvider) {
   const { children } = props;
   // themes
   return (
-    <StoreProvider>
-      <ThemeProvider themes={["light", "dark", "light-contrast", "dark-contrast", "custom"]} defaultTheme="system">
-        <AppProgressBar />
-        <TranslationProvider>
-          <ToastWithTheme />
-          <StoreWrapper>
-            <InstanceWrapper>
-              <Suspense>
-                <ChatSupportModal />
-                <PostHogProvider>
-                  <SWRConfig value={WEB_SWR_CONFIG}>{children}</SWRConfig>
-                </PostHogProvider>
-              </Suspense>
-            </InstanceWrapper>
-          </StoreWrapper>
-        </TranslationProvider>
-      </ThemeProvider>
-    </StoreProvider>
+    <TokenProvider>
+      <StoreProvider>
+        <ThemeProvider themes={["light", "dark", "light-contrast", "dark-contrast", "custom"]} defaultTheme="system">
+          <AppProgressBar />
+          <TranslationProvider>
+            <ToastWithTheme />
+            <StoreWrapper>
+              <InstanceWrapper>
+                <Suspense>
+                  <ChatSupportModal />
+                  <PostHogProvider>
+                    <SWRConfig value={WEB_SWR_CONFIG}>{children}</SWRConfig>
+                  </PostHogProvider>
+                </Suspense>
+              </InstanceWrapper>
+            </StoreWrapper>
+          </TranslationProvider>
+        </ThemeProvider>
+      </StoreProvider>
+    </TokenProvider>
   );
 }

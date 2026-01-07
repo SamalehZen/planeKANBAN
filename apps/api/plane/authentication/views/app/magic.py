@@ -25,6 +25,7 @@ from plane.authentication.adapter.error import (
     AUTHENTICATION_ERROR_CODES,
 )
 from plane.authentication.rate_limit import AuthenticationThrottle
+from plane.authentication.utils.auth_token import generate_auth_token
 from plane.utils.path_validator import get_safe_redirect_url
 
 
@@ -104,6 +105,8 @@ class MagicSignInEndpoint(View):
             profile, _ = Profile.objects.get_or_create(user=user)
             # Login the user and record his device info
             user_login(request=request, user=user, is_app=True)
+            # Generate auth token for cross-origin authentication
+            auth_token = generate_auth_token(user.id)
             if user.is_password_autoset and profile.is_onboarded:
                 # Redirect to the home page
                 path = "/"
@@ -114,7 +117,7 @@ class MagicSignInEndpoint(View):
             url = get_safe_redirect_url(
                 base_url=base_host(request=request, is_app=True),
                 next_path=path,
-                params={},
+                params={"auth_token": auth_token},
             )
             return HttpResponseRedirect(url)
 
@@ -173,6 +176,8 @@ class MagicSignUpEndpoint(View):
             user = provider.authenticate()
             # Login the user and record his device info
             user_login(request=request, user=user, is_app=True)
+            # Generate auth token for cross-origin authentication
+            auth_token = generate_auth_token(user.id)
             # Get the redirection path
             if next_path:
                 path = next_path
@@ -182,7 +187,7 @@ class MagicSignUpEndpoint(View):
             url = get_safe_redirect_url(
                 base_url=base_host(request=request, is_app=True),
                 next_path=path,
-                params={},
+                params={"auth_token": auth_token},
             )
             return HttpResponseRedirect(url)
 
