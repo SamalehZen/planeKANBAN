@@ -1,5 +1,7 @@
 # Django imports
 from django.views import View
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
 from django.contrib.auth import logout
 from django.http import HttpResponseRedirect
 from django.utils import timezone
@@ -9,6 +11,7 @@ from plane.authentication.utils.host import user_ip, base_host
 from plane.db.models import User
 
 
+@method_decorator(csrf_exempt, name="dispatch")
 class SignOutAuthEndpoint(View):
     def post(self, request):
         # Get user
