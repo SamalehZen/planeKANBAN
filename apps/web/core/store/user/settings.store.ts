@@ -20,6 +20,7 @@ export interface IUserSettingsStore {
   fetchCurrentUserSettings: (bustCache?: boolean) => Promise<IUserSettings | undefined>;
   toggleSidebar: (collapsed?: boolean) => void;
   toggleIsScrolled: (isScrolled?: boolean) => void;
+  setMockSettings: () => void;
 }
 
 export class UserSettingsStore implements IUserSettingsStore {
@@ -97,5 +98,27 @@ export class UserSettingsStore implements IUserSettingsStore {
       });
       throw error;
     }
+  };
+
+  /**
+   * @description sets mock settings data (bypasses authentication)
+   */
+  setMockSettings = () => {
+    runInAction(() => {
+      this.isLoading = false;
+      this.data = {
+        id: "mock-settings-id",
+        email: "demo@local.app",
+        workspace: {
+          last_workspace_id: "mock-workspace-id",
+          last_workspace_slug: "demo-workspace",
+          last_workspace_name: "Demo Workspace",
+          last_workspace_logo: undefined,
+          fallback_workspace_id: "mock-workspace-id",
+          fallback_workspace_slug: "demo-workspace",
+          invites: 0,
+        },
+      };
+    });
   };
 }

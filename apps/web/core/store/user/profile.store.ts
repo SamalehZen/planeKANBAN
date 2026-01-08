@@ -24,6 +24,7 @@ export interface IUserProfileStore {
   finishUserOnboarding: () => Promise<void>;
   updateTourCompleted: () => Promise<TUserProfile | undefined>;
   updateUserTheme: (data: Partial<IUserTheme>) => Promise<TUserProfile | undefined>;
+  setMockProfile: () => void;
 }
 
 export class ProfileStore implements IUserProfileStore {
@@ -237,5 +238,43 @@ export class ProfileStore implements IUserProfileStore {
       });
       throw error;
     }
+  };
+
+  /**
+   * @description sets mock profile data (bypasses authentication)
+   */
+  setMockProfile = () => {
+    runInAction(() => {
+      this.isLoading = false;
+      this.data = {
+        id: "mock-profile-id",
+        user: "mock-user-id-12345",
+        role: "admin",
+        last_workspace_id: "mock-workspace-id",
+        theme: {
+          theme: "light",
+          primary: undefined,
+          background: undefined,
+          darkPalette: false,
+        },
+        onboarding_step: {
+          workspace_join: true,
+          profile_complete: true,
+          workspace_create: true,
+          workspace_invite: true,
+        },
+        is_onboarded: true,
+        is_tour_completed: true,
+        use_case: "software",
+        billing_address_country: undefined,
+        billing_address: undefined,
+        has_billing_address: false,
+        has_marketing_email_consent: false,
+        language: "fr",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        start_of_the_week: EStartOfTheWeek.MONDAY,
+      };
+    });
   };
 }

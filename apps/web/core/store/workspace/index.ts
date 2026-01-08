@@ -155,7 +155,7 @@ export abstract class BaseWorkspaceRootStore implements IWorkspaceRootStore {
   getWorkspaceById = (workspaceId: string) => this.workspaces?.[workspaceId] || null; // TODO: use undefined instead of null
 
   /**
-   * fetch user workspaces from API
+   * fetch user workspaces from API (with mock fallback for no-auth mode)
    */
   fetchWorkspaces = async () => {
     this.loader = true;
@@ -167,22 +167,110 @@ export abstract class BaseWorkspaceRootStore implements IWorkspaceRootStore {
         });
       });
       return workspaceResponse;
+    } catch {
+      const mockWorkspace = {
+        id: "mock-workspace-id",
+        name: "Demo Workspace",
+        slug: "demo-workspace",
+        url: "/demo-workspace",
+        logo_url: null,
+        organization_size: "1-10",
+        total_members: 1,
+        total_projects: 0,
+        role: 20,
+        timezone: "Europe/Paris",
+        owner: {
+          id: "mock-user-id-12345",
+          first_name: "Utilisateur",
+          last_name: "Demo",
+          display_name: "Utilisateur Demo",
+          email: "demo@local.app",
+          avatar_url: "",
+          cover_image_url: null,
+          is_bot: false,
+          is_active: true,
+          is_email_verified: true,
+          is_password_autoset: false,
+          is_tour_completed: true,
+          mobile_number: null,
+          last_workspace_id: "mock-workspace-id",
+          user_timezone: "Europe/Paris",
+          username: "demo_user",
+          date_joined: new Date().toISOString(),
+          last_login_medium: "email" as const,
+          theme: { theme: "light" },
+        },
+        created_by: "mock-user-id-12345",
+        updated_by: "mock-user-id-12345",
+        created_at: new Date(),
+        updated_at: new Date(),
+      } as IWorkspace;
+      runInAction(() => {
+        set(this.workspaces, [mockWorkspace.id], mockWorkspace);
+      });
+      return [mockWorkspace];
     } finally {
       this.loader = false;
     }
   };
 
   /**
-   * create workspace using the workspace data
+   * create workspace using the workspace data (with mock fallback for no-auth mode)
    * @param data
    */
-  createWorkspace = async (data: Partial<IWorkspace>) =>
-    await this.workspaceService.createWorkspace(data).then((response) => {
+  createWorkspace = async (data: Partial<IWorkspace>) => {
+    try {
+      const response = await this.workspaceService.createWorkspace(data);
       runInAction(() => {
         this.workspaces = set(this.workspaces, response.id, response);
       });
       return response;
-    });
+    } catch {
+      const newId = `workspace-${Date.now()}`;
+      const newSlug = data.slug || `workspace-${Date.now()}`;
+      const mockResponse = {
+        id: newId,
+        name: data.name || "New Workspace",
+        slug: newSlug,
+        url: `/${newSlug}`,
+        logo_url: null,
+        organization_size: data.organization_size || "1-10",
+        total_members: 1,
+        total_projects: 0,
+        role: 20,
+        timezone: "Europe/Paris",
+        owner: {
+          id: "mock-user-id-12345",
+          first_name: "Utilisateur",
+          last_name: "Demo",
+          display_name: "Utilisateur Demo",
+          email: "demo@local.app",
+          avatar_url: "",
+          cover_image_url: null,
+          is_bot: false,
+          is_active: true,
+          is_email_verified: true,
+          is_password_autoset: false,
+          is_tour_completed: true,
+          mobile_number: null,
+          last_workspace_id: newId,
+          user_timezone: "Europe/Paris",
+          username: "demo_user",
+          date_joined: new Date().toISOString(),
+          last_login_medium: "email" as const,
+          theme: { theme: "light" },
+        },
+        created_by: "mock-user-id-12345",
+        updated_by: "mock-user-id-12345",
+        created_at: new Date(),
+        updated_at: new Date(),
+      } as IWorkspace;
+      runInAction(() => {
+        this.workspaces = set(this.workspaces, mockResponse.id, mockResponse);
+      });
+      return mockResponse;
+    }
+  };
 
   /**
    * update workspace using the workspace slug and new workspace data

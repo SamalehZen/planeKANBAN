@@ -100,45 +100,53 @@ export class UserStore implements IUserStore {
   }
 
   /**
-   * @description fetches the current user
+   * @description fetches the current user (BYPASSED - returns mock user)
    * @returns {Promise<IUser>}
    */
   fetchCurrentUser = async (): Promise<IUser> => {
-    try {
-      runInAction(() => {
-        this.isLoading = true;
-        this.error = undefined;
-      });
-      const user = await this.userService.currentUser();
-      if (user && user?.id) {
-        await Promise.all([
-          this.userProfile.fetchUserProfile(),
-          this.userSettings.fetchCurrentUserSettings(),
-          this.store.workspaceRoot.fetchWorkspaces(),
-        ]);
-        runInAction(() => {
-          this.data = user;
-          this.isLoading = false;
-          this.isAuthenticated = true;
-        });
-      } else
-        runInAction(() => {
-          this.data = user;
-          this.isLoading = false;
-          this.isAuthenticated = false;
-        });
-      return user;
-    } catch (error) {
-      runInAction(() => {
-        this.isLoading = false;
-        this.isAuthenticated = false;
-        this.error = {
-          status: "user-fetch-error",
-          message: "Failed to fetch current user",
-        };
-      });
-      throw error;
-    }
+    const mockUser: IUser = {
+      id: "mock-user-id-12345",
+      first_name: "Utilisateur",
+      last_name: "Demo",
+      display_name: "Utilisateur Demo",
+      email: "demo@local.app",
+      avatar_url: "",
+      cover_image_url: null,
+      is_bot: false,
+      is_active: true,
+      is_email_verified: true,
+      is_password_autoset: false,
+      is_tour_completed: true,
+      mobile_number: null,
+      last_workspace_id: "mock-workspace-id",
+      user_timezone: "Europe/Paris",
+      username: "demo_user",
+      date_joined: new Date().toISOString(),
+      last_login_medium: "email",
+      theme: {
+        theme: "light",
+        primary: undefined,
+        background: undefined,
+        darkPalette: false,
+      },
+    };
+
+    runInAction(() => {
+      this.isLoading = true;
+      this.error = undefined;
+    });
+
+    this.userProfile.setMockProfile();
+    this.userSettings.setMockSettings();
+    await this.store.workspaceRoot.fetchWorkspaces().catch(() => {});
+
+    runInAction(() => {
+      this.data = mockUser;
+      this.isLoading = false;
+      this.isAuthenticated = true;
+    });
+
+    return mockUser;
   };
 
   /**
