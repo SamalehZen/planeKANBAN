@@ -125,7 +125,7 @@ else:
     CORS_ALLOW_ALL_ORIGINS = True
     secure_origins = False
 
-CORS_ALLOW_HEADERS = [*default_headers, "X-API-Key"]
+CORS_ALLOW_HEADERS = [*default_headers, "X-API-Key", "Authorization"]
 
 # Application Settings
 WSGI_APPLICATION = "plane.wsgi.application"
