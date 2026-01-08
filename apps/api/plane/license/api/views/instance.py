@@ -16,7 +16,7 @@ from plane.license.api.permissions import InstanceAdminPermission
 from plane.license.api.serializers import InstanceSerializer
 from plane.license.models import Instance
 from plane.license.utils.instance_value import get_configuration_value
-from plane.utils.cache import cache_response, invalidate_cache
+from plane.utils.cache import invalidate_cache
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_control
 
@@ -27,7 +27,6 @@ class InstanceEndpoint(BaseAPIView):
             return [InstanceAdminPermission()]
         return [AllowAny()]
 
-    @cache_response(60 * 60 * 2, user=False)
     @method_decorator(cache_control(private=True, max_age=12))
     def get(self, request):
         instance = Instance.objects.first()
