@@ -1,10 +1,13 @@
 # Python imports
 import logging
 import time
+import traceback
+import json
 
 # Django imports
 from django.http import HttpRequest
 from django.utils import timezone
+from django.conf import settings
 
 # Third party imports
 from rest_framework.request import Request
@@ -15,6 +18,7 @@ from plane.utils.exception_logger import log_exception
 from plane.bgtasks.logger_task import process_logs
 
 api_logger = logging.getLogger("plane.api.request")
+diag_logger = logging.getLogger("plane.diagnostic")
 
 
 class RequestLoggerMiddleware:
@@ -25,35 +29,76 @@ class RequestLoggerMiddleware:
         """
         Determines whether a route should be logged based on the request and status code.
         """
-        # Don't log health checks
         if request.path == "/" and request.method == "GET":
             return False
         return True
 
-    def __call__(self, request):
-        # get the start time
-        start_time = time.time()
+    def _get_request_body_preview(self, request):
+        """Get a preview of request body for diagnostic logging."""
+        try:
+            if hasattr(request, '_body'):
+                body = request._body
+                if body:
+                    try:
+                        decoded = body.decode('utf-8')[:500]
+                        return decoded
+                    except:
+                        return "[Binary data]"
+            return None
+        except:
+            return "[Unable to read body]"
 
-        # Get the response
+    def __call__(self, request):
+        start_time = time.time()
+        
+        diag_logger.info("="*60)
+        diag_logger.info(f"[DIAG REQUEST START] {request.method} {request.get_full_path()}")
+        diag_logger.info(f"[DIAG] Remote IP: {get_client_ip(request)}")
+        diag_logger.info(f"[DIAG] Content-Type: {request.META.get('CONTENT_TYPE', 'None')}")
+        diag_logger.info(f"[DIAG] Authorization: {request.META.get('HTTP_AUTHORIZATION', 'None')[:50] if request.META.get('HTTP_AUTHORIZATION') else 'None'}...")
+        diag_logger.info(f"[DIAG] X-API-Key: {request.META.get('HTTP_X_API_KEY', 'None')[:20] if request.META.get('HTTP_X_API_KEY') else 'None'}...")
+        diag_logger.info(f"[DIAG] Session Cookie: {'Present' if request.COOKIES.get(settings.SESSION_COOKIE_NAME) else 'None'}")
+        diag_logger.info(f"[DIAG] User-Agent: {request.META.get('HTTP_USER_AGENT', 'None')[:100]}")
+        
+        if request.method in ['POST', 'PUT', 'PATCH']:
+            body_preview = self._get_request_body_preview(request)
+            if body_preview:
+                diag_logger.info(f"[DIAG] Request Body Preview: {body_preview}")
+
         response = self.get_response(request)
 
-        # calculate the duration
         duration = time.time() - start_time
-
-        # Check if logging is required
-        log_true = self._should_log_route(request=request)
-
-        # If logging is not required, return the response
-        if not log_true:
-            return response
 
         user_id = (
             request.user.id if getattr(request, "user") and getattr(request.user, "is_authenticated", False) else None
         )
+        user_email = (
+            request.user.email if getattr(request, "user") and getattr(request.user, "is_authenticated", False) else "Anonymous"
+        )
+
+        diag_logger.info(f"[DIAG RESPONSE] Status: {response.status_code}")
+        diag_logger.info(f"[DIAG] Duration: {int(duration * 1000)}ms")
+        diag_logger.info(f"[DIAG] User: {user_email} (ID: {user_id})")
+        diag_logger.info(f"[DIAG] Authenticated: {getattr(request.user, 'is_authenticated', False) if hasattr(request, 'user') else False}")
+        
+        if response.status_code >= 400:
+            diag_logger.warning(f"[DIAG ERROR] Status {response.status_code} for {request.method} {request.path}")
+            try:
+                if hasattr(response, 'content'):
+                    content = response.content.decode('utf-8')[:1000]
+                    diag_logger.warning(f"[DIAG ERROR] Response Body: {content}")
+            except:
+                pass
+        
+        diag_logger.info(f"[DIAG REQUEST END] {request.method} {request.get_full_path()}")
+        diag_logger.info("="*60)
+
+        log_true = self._should_log_route(request=request)
+        if not log_true:
+            return response
 
         user_agent = request.META.get("HTTP_USER_AGENT", "")
 
-        # Log the request information
         api_logger.info(
             f"{request.method} {request.get_full_path()} {response.status_code}",
             extra={
@@ -67,7 +112,6 @@ class RequestLoggerMiddleware:
             },
         )
 
-        # return the response
         return response
 
 

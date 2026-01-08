@@ -1,6 +1,7 @@
 # Python imports
 import zoneinfo
 import logging
+import traceback
 
 # Django imports
 from django.conf import settings
@@ -28,6 +29,7 @@ from plane.utils.core.mixins import ReadReplicaControlMixin
 
 
 logger = logging.getLogger("plane.api")
+diag_logger = logging.getLogger("plane.diagnostic")
 
 
 class TimezoneMixin:
@@ -52,17 +54,23 @@ class BaseAPIView(TimezoneMixin, GenericAPIView, ReadReplicaControlMixin, BasePa
     use_read_replica = False
     
     def initial(self, request, *args, **kwargs):
-        # Log authentication headers for debugging
+        diag_logger.info(f"[API INIT] {self.__class__.__name__} - {request.method} {request.path}")
+        
         auth_header = request.META.get('HTTP_AUTHORIZATION', 'None')
         api_key = request.META.get('HTTP_X_API_KEY', 'None')
-        logger.info(f"[AUTH DEBUG] Path: {request.path}")
-        logger.info(f"[AUTH DEBUG] Authorization header: {auth_header[:50] if auth_header != 'None' else 'None'}...")
-        logger.info(f"[AUTH DEBUG] X-API-Key header: {api_key[:20] if api_key != 'None' else 'None'}...")
+        diag_logger.info(f"[API AUTH] Authorization header: {auth_header[:50] if auth_header != 'None' else 'None'}...")
+        diag_logger.info(f"[API AUTH] X-API-Key header: {api_key[:20] if api_key != 'None' else 'None'}...")
+        diag_logger.info(f"[API AUTH] Session cookie: {'Present' if request.COOKIES.get(settings.SESSION_COOKIE_NAME) else 'None'}")
         
-        super().initial(request, *args, **kwargs)
+        try:
+            super().initial(request, *args, **kwargs)
+        except Exception as e:
+            diag_logger.error(f"[API INIT ERROR] {type(e).__name__}: {str(e)}")
+            diag_logger.error(f"[API INIT ERROR] Traceback: {traceback.format_exc()}")
+            raise
         
-        logger.info(f"[AUTH DEBUG] Authenticated: {request.user.is_authenticated}")
-        logger.info(f"[AUTH DEBUG] User: {request.user.id if request.user.is_authenticated else 'Anonymous'}")
+        diag_logger.info(f"[API AUTH] Authenticated: {request.user.is_authenticated}")
+        diag_logger.info(f"[API AUTH] User: {request.user.email if request.user.is_authenticated else 'Anonymous'}")
 
     def filter_queryset(self, queryset):
         for backend in list(self.filter_backends):
@@ -89,40 +97,50 @@ class BaseAPIView(TimezoneMixin, GenericAPIView, ReadReplicaControlMixin, BasePa
         Handle any exception that occurs, by returning an appropriate response,
         or re-raising the error.
         """
+        diag_logger.error(f"[API EXCEPTION] {type(exc).__name__}: {str(exc)}")
+        diag_logger.error(f"[API EXCEPTION] View: {self.__class__.__name__}")
+        diag_logger.error(f"[API EXCEPTION] Path: {self.request.path if hasattr(self, 'request') else 'N/A'}")
+        diag_logger.error(f"[API EXCEPTION] User: {self.request.user.email if hasattr(self, 'request') and self.request.user.is_authenticated else 'Anonymous'}")
+        diag_logger.error(f"[API EXCEPTION] Traceback: {traceback.format_exc()}")
+        
         try:
             response = super().handle_exception(exc)
             return response
         except Exception as e:
+            diag_logger.error(f"[API EXCEPTION] Secondary exception: {type(e).__name__}: {str(e)}")
             (print(e) if settings.DEBUG else print("Server Error"))
             if isinstance(e, IntegrityError):
+                diag_logger.error(f"[API EXCEPTION] IntegrityError: {str(e)}")
                 return Response(
-                    {"error": "The payload is not valid"},
+                    {"error": "The payload is not valid", "detail": str(e) if settings.DEBUG else None},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
             if isinstance(e, ValidationError):
+                diag_logger.error(f"[API EXCEPTION] ValidationError: {str(e)}")
                 return Response(
-                    {"error": "Please provide valid detail"},
+                    {"error": "Please provide valid detail", "detail": str(e) if settings.DEBUG else None},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
             if isinstance(e, ObjectDoesNotExist):
                 model_name = str(exc).split(" matching query does not exist.")[0]
+                diag_logger.error(f"[API EXCEPTION] ObjectDoesNotExist: {model_name}")
                 return Response(
-                    {"error": f"The required object {model_name} does not exist."},
+                    {"error": f"The required object {model_name} does not exist.", "detail": str(exc) if settings.DEBUG else None},
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
             if isinstance(e, KeyError):
-                capture_message(f"key error in {request.user} for {request.path}")
+                diag_logger.error(f"[API EXCEPTION] KeyError: {str(e)}")
                 return Response(
-                    {"error": "The required key does not exist."},
+                    {"error": "The required key does not exist.", "key": str(e) if settings.DEBUG else None},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            log_exception(e)
+            log_exception(e, request=self.request if hasattr(self, 'request') else None)
             return Response(
-                {"error": "Something went wrong. Please try again later."},
+                {"error": "Something went wrong. Please try again later.", "detail": str(e) if settings.DEBUG else None},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
@@ -152,48 +170,59 @@ class BaseViewSet(TimezoneMixin, ModelViewSet, BasePaginator):
         Handle any exception that occurs, by returning an appropriate response,
         or re-raising the error.
         """
+        diag_logger.error(f"[API VIEWSET EXCEPTION] {type(exc).__name__}: {str(exc)}")
+        diag_logger.error(f"[API VIEWSET EXCEPTION] View: {self.__class__.__name__}")
+        diag_logger.error(f"[API VIEWSET EXCEPTION] Traceback: {traceback.format_exc()}")
+        
         try:
             response = super().handle_exception(exc)
             return response
         except Exception as e:
+            diag_logger.error(f"[API VIEWSET EXCEPTION] Secondary exception: {type(e).__name__}: {str(e)}")
             (print(e) if settings.DEBUG else print("Server Error"))
             if isinstance(e, IntegrityError):
+                diag_logger.error(f"[API VIEWSET EXCEPTION] IntegrityError: {str(e)}")
                 return Response(
-                    {"error": "The payload is not valid"},
+                    {"error": "The payload is not valid", "detail": str(e) if settings.DEBUG else None},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
             if isinstance(e, ValidationError):
+                diag_logger.error(f"[API VIEWSET EXCEPTION] ValidationError: {str(e)}")
                 return Response(
-                    {"error": "Please provide valid detail"},
+                    {"error": "Please provide valid detail", "detail": str(e) if settings.DEBUG else None},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
             if isinstance(e, ObjectDoesNotExist):
                 model_name = str(exc).split(" matching query does not exist.")[0]
+                diag_logger.error(f"[API VIEWSET EXCEPTION] ObjectDoesNotExist: {model_name}")
                 return Response(
-                    {"error": f"The required object {model_name} does not exist."},
+                    {"error": f"The required object {model_name} does not exist.", "detail": str(exc) if settings.DEBUG else None},
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
             if isinstance(e, KeyError):
+                diag_logger.error(f"[API VIEWSET EXCEPTION] KeyError: {str(e)}")
                 return Response(
-                    {"error": "The required key does not exist."},
+                    {"error": "The required key does not exist.", "key": str(e) if settings.DEBUG else None},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            log_exception(e)
+            log_exception(e, request=self.request if hasattr(self, 'request') else None)
             return Response(
-                {"error": "Something went wrong. Please try again later."},
+                {"error": "Something went wrong. Please try again later.", "detail": str(e) if settings.DEBUG else None},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
     def dispatch(self, request, *args, **kwargs):
+        diag_logger.info(f"[API VIEWSET DISPATCH] {self.__class__.__name__} handling {request.method} {request.path}")
+        
         response = super().dispatch(request, *args, **kwargs)
 
         if settings.DEBUG:
             from django.db import connection
-
+            diag_logger.info(f"[API VIEWSET DISPATCH] DB Queries: {len(connection.queries)}")
             print(
                 f"{request.method} - {request.get_full_path()} of Queries: {len(connection.queries)}"
             )

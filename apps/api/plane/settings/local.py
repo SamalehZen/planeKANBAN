@@ -81,5 +81,10 @@ LOGGING = {
             "handlers": ["console"],
             "propagate": False,
         },
+        "plane.diagnostic": {
+            "level": "DEBUG",
+            "handlers": ["console"],
+            "propagate": False,
+        },
     },
 }
