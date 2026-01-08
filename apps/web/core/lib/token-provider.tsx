@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useLayoutEffect, useState } from "react";
 import { setGlobalAuthTokenGetter } from "@plane/services";
 import { extractTokenFromUrl, getAuthToken, setAuthToken } from "./auth-token";
 
@@ -14,9 +14,16 @@ const initializeToken = () => {
 };
 
 export function TokenProvider({ children }: { children: React.ReactNode }) {
-  useEffect(() => {
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  useLayoutEffect(() => {
     initializeToken();
+    setIsInitialized(true);
   }, []);
+
+  if (!isInitialized) {
+    return null;
+  }
 
   return <>{children}</>;
 }
