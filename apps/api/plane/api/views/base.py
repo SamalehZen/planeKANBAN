@@ -50,6 +50,19 @@ class BaseAPIView(TimezoneMixin, GenericAPIView, ReadReplicaControlMixin, BasePa
     permission_classes = [IsAuthenticated]
 
     use_read_replica = False
+    
+    def initial(self, request, *args, **kwargs):
+        # Log authentication headers for debugging
+        auth_header = request.META.get('HTTP_AUTHORIZATION', 'None')
+        api_key = request.META.get('HTTP_X_API_KEY', 'None')
+        logger.info(f"[AUTH DEBUG] Path: {request.path}")
+        logger.info(f"[AUTH DEBUG] Authorization header: {auth_header[:50] if auth_header != 'None' else 'None'}...")
+        logger.info(f"[AUTH DEBUG] X-API-Key header: {api_key[:20] if api_key != 'None' else 'None'}...")
+        
+        super().initial(request, *args, **kwargs)
+        
+        logger.info(f"[AUTH DEBUG] Authenticated: {request.user.is_authenticated}")
+        logger.info(f"[AUTH DEBUG] User: {request.user.id if request.user.is_authenticated else 'Anonymous'}")
 
     def filter_queryset(self, queryset):
         for backend in list(self.filter_backends):
@@ -80,6 +93,7 @@ class BaseAPIView(TimezoneMixin, GenericAPIView, ReadReplicaControlMixin, BasePa
             response = super().handle_exception(exc)
             return response
         except Exception as e:
+            (print(e) if settings.DEBUG else print("Server Error"))
             if isinstance(e, IntegrityError):
                 return Response(
                     {"error": "The payload is not valid"},
@@ -93,12 +107,14 @@ class BaseAPIView(TimezoneMixin, GenericAPIView, ReadReplicaControlMixin, BasePa
                 )
 
             if isinstance(e, ObjectDoesNotExist):
+                model_name = str(exc).split(" matching query does not exist.")[0]
                 return Response(
-                    {"error": "The requested resource does not exist."},
+                    {"error": f"The required object {model_name} does not exist."},
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
             if isinstance(e, KeyError):
+                capture_message(f"key error in {request.user} for {request.path}")
                 return Response(
                     {"error": "The required key does not exist."},
                     status=status.HTTP_400_BAD_REQUEST,
@@ -106,69 +122,23 @@ class BaseAPIView(TimezoneMixin, GenericAPIView, ReadReplicaControlMixin, BasePa
 
             log_exception(e)
             return Response(
-                {"error": "Something went wrong please try again later"},
+                {"error": "Something went wrong. Please try again later."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-    def dispatch(self, request, *args, **kwargs):
-        try:
-            response = super().dispatch(request, *args, **kwargs)
-            if settings.DEBUG:
-                from django.db import connection
 
-                print(f"{request.method} - {request.get_full_path()} of Queries: {len(connection.queries)}")
-            return response
-        except Exception as exc:
-            response = self.handle_exception(exc)
-            return exc
-
-    def finalize_response(self, request, response, *args, **kwargs):
-        # Call super to get the default response
-        response = super().finalize_response(request, response, *args, **kwargs)
-
-        # Add custom headers if they exist in the request META
-        ratelimit_remaining = request.META.get("X-RateLimit-Remaining")
-        if ratelimit_remaining is not None:
-            response["X-RateLimit-Remaining"] = ratelimit_remaining
-
-        ratelimit_reset = request.META.get("X-RateLimit-Reset")
-        if ratelimit_reset is not None:
-            response["X-RateLimit-Reset"] = ratelimit_reset
-
-        return response
-
-    @property
-    def workspace_slug(self):
-        return self.kwargs.get("slug", None)
-
-    @property
-    def project_id(self):
-        project_id = self.kwargs.get("project_id", None)
-        if project_id:
-            return project_id
-
-        if resolve(self.request.path_info).url_name == "project":
-            return self.kwargs.get("pk", None)
-
-    @property
-    def fields(self):
-        fields = [field for field in self.request.GET.get("fields", "").split(",") if field]
-        return fields if fields else None
-
-    @property
-    def expand(self):
-        expand = [expand for expand in self.request.GET.get("expand", "").split(",") if expand]
-        return expand if expand else None
-
-
-class BaseViewSet(TimezoneMixin, ReadReplicaControlMixin, ModelViewSet, BasePaginator):
+class BaseViewSet(TimezoneMixin, ModelViewSet, BasePaginator):
     model = None
 
-    authentication_classes = [APIKeyAuthentication]
     permission_classes = [
         IsAuthenticated,
     ]
-    use_read_replica = False
+
+    filter_backends = ()
+
+    filterset_fields = []
+
+    search_fields = []
 
     def get_queryset(self):
         try:
@@ -186,47 +156,27 @@ class BaseViewSet(TimezoneMixin, ReadReplicaControlMixin, ModelViewSet, BasePagi
             response = super().handle_exception(exc)
             return response
         except Exception as e:
+            (print(e) if settings.DEBUG else print("Server Error"))
             if isinstance(e, IntegrityError):
-                log_exception(e)
                 return Response(
                     {"error": "The payload is not valid"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
             if isinstance(e, ValidationError):
-                logger.warning(
-                    "Validation Error",
-                    extra={
-                        "error_code": "VALIDATION_ERROR",
-                        "error_message": str(e),
-                    },
-                )
                 return Response(
                     {"error": "Please provide valid detail"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
             if isinstance(e, ObjectDoesNotExist):
-                logger.warning(
-                    "Object Does Not Exist",
-                    extra={
-                        "error_code": "OBJECT_DOES_NOT_EXIST",
-                        "error_message": str(e),
-                    },
-                )
+                model_name = str(exc).split(" matching query does not exist.")[0]
                 return Response(
-                    {"error": "The required object does not exist."},
+                    {"error": f"The required object {model_name} does not exist."},
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
             if isinstance(e, KeyError):
-                logger.error(
-                    "Key Error",
-                    extra={
-                        "error_code": "KEY_ERROR",
-                        "error_message": str(e),
-                    },
-                )
                 return Response(
                     {"error": "The required key does not exist."},
                     status=status.HTTP_400_BAD_REQUEST,
@@ -234,43 +184,17 @@ class BaseViewSet(TimezoneMixin, ReadReplicaControlMixin, ModelViewSet, BasePagi
 
             log_exception(e)
             return Response(
-                {"error": "Something went wrong please try again later"},
+                {"error": "Something went wrong. Please try again later."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
     def dispatch(self, request, *args, **kwargs):
-        try:
-            response = super().dispatch(request, *args, **kwargs)
+        response = super().dispatch(request, *args, **kwargs)
 
-            if settings.DEBUG:
-                from django.db import connection
+        if settings.DEBUG:
+            from django.db import connection
 
-                print(f"{request.method} - {request.get_full_path()} of Queries: {len(connection.queries)}")
-
-            return response
-        except Exception as exc:
-            response = self.handle_exception(exc)
-            return response
-
-    @property
-    def workspace_slug(self):
-        return self.kwargs.get("slug", None)
-
-    @property
-    def project_id(self):
-        project_id = self.kwargs.get("project_id", None)
-        if project_id:
-            return project_id
-
-        if resolve(self.request.path_info).url_name == "project":
-            return self.kwargs.get("pk", None)
-
-    @property
-    def fields(self):
-        fields = [field for field in self.request.GET.get("fields", "").split(",") if field]
-        return fields if fields else None
-
-    @property
-    def expand(self):
-        expand = [expand for expand in self.request.GET.get("expand", "").split(",") if expand]
-        return expand if expand else None
+            print(
+                f"{request.method} - {request.get_full_path()} of Queries: {len(connection.queries)}"
+            )
+        return response
