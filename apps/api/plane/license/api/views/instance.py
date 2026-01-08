@@ -32,10 +32,12 @@ class InstanceEndpoint(BaseAPIView):
     def get(self, request):
         instance = Instance.objects.first()
 
-        # get the instance
         if instance is None:
             return Response(
-                {"is_activated": False, "is_setup_done": False},
+                {
+                    "instance": {"is_activated": False, "is_setup_done": False},
+                    "config": {},
+                },
                 status=status.HTTP_200_OK,
             )
         # Return instance
