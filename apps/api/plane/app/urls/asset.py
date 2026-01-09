@@ -16,6 +16,7 @@ from plane.app.views import (
     DuplicateAssetEndpoint,
     WorkspaceAssetDownloadEndpoint,
     ProjectAssetDownloadEndpoint,
+    WorkspaceFileAssetProxyUploadEndpoint,
 )
 
 
@@ -106,5 +107,10 @@ urlpatterns = [
         "assets/v2/workspaces/<str:slug>/projects/<uuid:project_id>/download/<uuid:asset_id>/",
         ProjectAssetDownloadEndpoint.as_view(),
         name="project-asset-download",
+    ),
+    path(
+        "assets/v2/workspaces/<str:slug>/proxy-upload/",
+        WorkspaceFileAssetProxyUploadEndpoint.as_view(),
+        name="workspace-proxy-upload",
     ),
 ]

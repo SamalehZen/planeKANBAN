@@ -69,21 +69,24 @@ export class FileService extends APIService {
     file: File,
     uploadProgressHandler?: AxiosRequestConfig["onUploadProgress"]
   ): Promise<TFileSignedURLResponse> {
-    const fileMetaData = await getFileMetaDataForUpload(file);
-    return this.post(`/api/assets/v2/workspaces/${workspaceSlug}/`, {
-      ...data,
-      ...fileMetaData,
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("entity_type", data.entity_type);
+    if (data.entity_identifier) {
+      formData.append("entity_identifier", data.entity_identifier);
+    }
+
+    return this.post(`/api/assets/v2/workspaces/${workspaceSlug}/proxy-upload/`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+      onUploadProgress: uploadProgressHandler,
     })
-      .then(async (response) => {
-        const signedURLResponse: TFileSignedURLResponse = response?.data;
-        const fileUploadPayload = generateFileUploadPayload(signedURLResponse, file);
-        await this.fileUploadService.uploadFile(
-          signedURLResponse.upload_data.url,
-          fileUploadPayload,
-          uploadProgressHandler
-        );
-        await this.updateWorkspaceAssetUploadStatus(workspaceSlug.toString(), signedURLResponse.asset_id);
-        return signedURLResponse;
+      .then((response) => {
+        const proxyResponse = response?.data;
+        return {
+          asset_id: proxyResponse.asset_id,
+          asset_url: proxyResponse.asset_url,
+          upload_data: { url: "", fields: {} },
+        } as TFileSignedURLResponse;
       })
       .catch((error) => {
         throw error?.response?.data;
