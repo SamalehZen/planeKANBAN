@@ -132,7 +132,7 @@ class BaseViewSet(TimezoneMixin, ReadReplicaControlMixin, ModelViewSet, BasePagi
         except Exception as exc:
             diag_logger.error(f"[VIEWSET DISPATCH] Exception in dispatch: {type(exc).__name__}: {str(exc)}")
             response = self.handle_exception(exc)
-            return exc
+            return response
 
     @property
     def workspace_slug(self):
@@ -239,7 +239,7 @@ class BaseAPIView(TimezoneMixin, ReadReplicaControlMixin, APIView, BasePaginator
         except Exception as exc:
             diag_logger.error(f"[APIVIEW DISPATCH] Exception in dispatch: {type(exc).__name__}: {str(exc)}")
             response = self.handle_exception(exc)
-            return exc
+            return response
 
     @property
     def workspace_slug(self):
