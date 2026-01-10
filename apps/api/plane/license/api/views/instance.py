@@ -41,8 +41,6 @@ class InstanceEndpoint(BaseAPIView):
             )
         # Return instance
         serializer = InstanceSerializer(instance)
-        data = serializer.data
-        data["is_activated"] = True
         # Get all the configuration
         (
             ENABLE_SIGNUP,
@@ -179,6 +177,7 @@ class InstanceEndpoint(BaseAPIView):
         data["is_self_managed"] = settings.IS_SELF_MANAGED
 
         instance_data = serializer.data
+        instance_data["is_activated"] = True
         instance_data["workspaces_exist"] = Workspace.objects.count() >= 1
 
         response_data = {"config": data, "instance": instance_data}
