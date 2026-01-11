@@ -27,7 +27,9 @@ CORS_ALLOW_CREDENTIALS = True
 SECURE_SSL_REDIRECT = True
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SESSION_COOKIE_SECURE = True
+SESSION_COOKIE_SAMESITE = "None"
 CSRF_COOKIE_SECURE = True
+CSRF_COOKIE_SAMESITE = "None"
 
 # Trust Render's proxy
 USE_X_FORWARDED_HOST = True
@@ -112,6 +114,11 @@ LOGGING = {
         "plane.migrations": {
             "level": "DEBUG" if DEBUG else "INFO",
             "handlers": ["console"],
+            "propagate": False,
+        },
+        "plane.diagnostic": {
+            "level": "DEBUG",
+            "handlers": ["console", "file"],
             "propagate": False,
         },
     },

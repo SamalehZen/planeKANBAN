@@ -16,7 +16,7 @@ from plane.license.api.permissions import InstanceAdminPermission
 from plane.license.api.serializers import InstanceSerializer
 from plane.license.models import Instance
 from plane.license.utils.instance_value import get_configuration_value
-from plane.utils.cache import cache_response, invalidate_cache
+from plane.utils.cache import invalidate_cache
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_control
 
@@ -27,21 +27,20 @@ class InstanceEndpoint(BaseAPIView):
             return [InstanceAdminPermission()]
         return [AllowAny()]
 
-    @cache_response(60 * 60 * 2, user=False)
     @method_decorator(cache_control(private=True, max_age=12))
     def get(self, request):
         instance = Instance.objects.first()
 
-        # get the instance
         if instance is None:
             return Response(
-                {"is_activated": False, "is_setup_done": False},
+                {
+                    "instance": {"is_activated": False, "is_setup_done": False},
+                    "config": {},
+                },
                 status=status.HTTP_200_OK,
             )
         # Return instance
         serializer = InstanceSerializer(instance)
-        data = serializer.data
-        data["is_activated"] = True
         # Get all the configuration
         (
             ENABLE_SIGNUP,
@@ -178,6 +177,7 @@ class InstanceEndpoint(BaseAPIView):
         data["is_self_managed"] = settings.IS_SELF_MANAGED
 
         instance_data = serializer.data
+        instance_data["is_activated"] = True
         instance_data["workspaces_exist"] = Workspace.objects.count() >= 1
 
         response_data = {"config": data, "instance": instance_data}

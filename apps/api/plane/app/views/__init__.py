@@ -110,6 +110,7 @@ from .asset.v2 import (
     DuplicateAssetEndpoint,
     WorkspaceAssetDownloadEndpoint,
     ProjectAssetDownloadEndpoint,
+    WorkspaceFileAssetProxyUploadEndpoint,
 )
 from .issue.base import (
     IssueListEndpoint,
