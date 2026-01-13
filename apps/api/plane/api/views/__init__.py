@@ -23,6 +23,7 @@ from .issue import (
     IssueActivityDetailAPIEndpoint,
     IssueAttachmentListCreateAPIEndpoint,
     IssueAttachmentDetailAPIEndpoint,
+    IssueAttachmentProxyUploadEndpoint,
     IssueSearchEndpoint,
 )
 

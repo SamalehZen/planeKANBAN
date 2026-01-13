@@ -2138,6 +2138,104 @@ class IssueAttachmentDetailAPIEndpoint(BaseAPIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+class IssueAttachmentProxyUploadEndpoint(BaseAPIView):
+    """
+    Proxy upload endpoint for issue attachments.
+    Uploads files through the server to R2/S3, bypassing CORS issues.
+    """
+
+    def post(self, request, slug, project_id, issue_id):
+        issue = Issue.objects.get(pk=issue_id, workspace__slug=slug, project_id=project_id)
+        if not user_has_issue_permission(
+            request.user.id,
+            project_id=project_id,
+            issue=issue,
+            allowed_roles=[ROLE.ADMIN.value, ROLE.MEMBER.value, ROLE.GUEST.value],
+            allow_creator=True,
+        ):
+            return Response(
+                {"error": "You are not allowed to upload this attachment"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        uploaded_file = request.FILES.get("file")
+        if not uploaded_file:
+            return Response(
+                {"error": "No file provided.", "status": False},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        content_type = uploaded_file.content_type
+        if content_type not in settings.ATTACHMENT_MIME_TYPES:
+            return Response(
+                {"error": "Invalid file type.", "status": False},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        file_size = uploaded_file.size
+        size_limit = settings.FILE_SIZE_LIMIT
+        if file_size > size_limit:
+            return Response(
+                {"error": f"File size exceeds limit of {size_limit} bytes.", "status": False},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        workspace = Workspace.objects.get(slug=slug)
+        asset_key = f"{workspace.id}/{uuid.uuid4().hex}-{uploaded_file.name}"
+
+        asset = FileAsset.objects.create(
+            attributes={"name": uploaded_file.name, "type": content_type, "size": file_size},
+            asset=asset_key,
+            size=file_size,
+            workspace=workspace,
+            created_by=request.user,
+            issue_id=issue_id,
+            project_id=project_id,
+            entity_type=FileAsset.EntityTypeContext.ISSUE_ATTACHMENT,
+        )
+
+        storage = S3Storage(request=request, is_server=True)
+        upload_success = storage.upload_file(
+            file_obj=uploaded_file,
+            object_name=asset_key,
+            content_type=content_type,
+        )
+
+        if not upload_success:
+            asset.delete()
+            return Response(
+                {"error": "Failed to upload file to storage.", "status": False},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        asset.is_uploaded = True
+        asset.save(update_fields=["is_uploaded"])
+
+        get_asset_object_metadata.delay(asset_id=str(asset.id))
+
+        issue_activity.delay(
+            type="attachment.activity.created",
+            requested_data=None,
+            actor_id=str(request.user.id),
+            issue_id=str(issue_id),
+            project_id=str(project_id),
+            current_instance=json.dumps(IssueAttachmentSerializer(asset).data, cls=DjangoJSONEncoder),
+            epoch=int(timezone.now().timestamp()),
+            notification=True,
+            origin=base_host(request=request, is_app=True),
+        )
+
+        return Response(
+            {
+                "asset_id": str(asset.id),
+                "asset_url": asset.asset_url,
+                "attachment": IssueAttachmentSerializer(asset).data,
+                "status": True,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
 class IssueSearchEndpoint(BaseAPIView):
     """Endpoint to search across multiple fields in the issues"""
 
