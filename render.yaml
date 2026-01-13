@@ -100,7 +100,7 @@ services:
     env: node
     region: frankfurt
     plan: free
-    buildCommand: corepack enable && corepack prepare pnpm@10.24.0 --activate && pnpm install --frozen-lockfile && pnpm --filter "...live" build
+    buildCommand: corepack enable && corepack prepare pnpm@10.24.0 --activate && pnpm install --frozen-lockfile && pnpm turbo run build --filter=live
     startCommand: node apps/live/dist/start.mjs
     envVars:
       - fromGroup: plane-runtime
@@ -116,7 +116,7 @@ services:
     env: node
     region: frankfurt
     plan: free
-    buildCommand: corepack enable && corepack prepare pnpm@10.24.0 --activate && pnpm install --frozen-lockfile && pnpm --filter "...space" build
+    buildCommand: corepack enable && corepack prepare pnpm@10.24.0 --activate && pnpm install --frozen-lockfile && pnpm turbo run build --filter=space
     startCommand: corepack enable && PORT=$PORT pnpm --filter space exec react-router-serve ./build/server/index.js
     envVars:
       - fromGroup: plane-client
@@ -128,7 +128,7 @@ services:
   - type: web
     name: plane-web
     env: static
-    buildCommand: corepack enable && corepack prepare pnpm@10.24.0 --activate && pnpm install --frozen-lockfile && pnpm --filter "...web" build
+    buildCommand: corepack enable && corepack prepare pnpm@10.24.0 --activate && pnpm install --frozen-lockfile && pnpm turbo run build --filter=web
     staticPublishPath: apps/web/build/client
     envVars:
       - fromGroup: plane-client
@@ -142,7 +142,7 @@ services:
   - type: web
     name: plane-admin
     env: static
-    buildCommand: corepack enable && corepack prepare pnpm@10.24.0 --activate && pnpm install --frozen-lockfile && pnpm --filter "...admin" build
+    buildCommand: corepack enable && corepack prepare pnpm@10.24.0 --activate && pnpm install --frozen-lockfile && pnpm turbo run build --filter=admin
     staticPublishPath: apps/admin/build/client
     envVars:
       - fromGroup: plane-client
