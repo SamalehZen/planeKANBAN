@@ -138,14 +138,14 @@ new_url_patterns = [
         name="work-item-attachment-list",
     ),
     path(
-        "workspaces/<str:slug>/projects/<uuid:project_id>/work-items/<uuid:issue_id>/attachments/<uuid:pk>/",
-        IssueAttachmentDetailAPIEndpoint.as_view(http_method_names=["get", "patch", "delete"]),
-        name="work-item-attachment-detail",
-    ),
-    path(
         "workspaces/<str:slug>/projects/<uuid:project_id>/work-items/<uuid:issue_id>/attachments/proxy-upload/",
         IssueAttachmentProxyUploadEndpoint.as_view(http_method_names=["post"]),
         name="work-item-attachment-proxy-upload",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/work-items/<uuid:issue_id>/attachments/<uuid:pk>/",
+        IssueAttachmentDetailAPIEndpoint.as_view(http_method_names=["get", "patch", "delete"]),
+        name="work-item-attachment-detail",
     ),
 ]
 
