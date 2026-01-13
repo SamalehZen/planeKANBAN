@@ -3,6 +3,7 @@ import { observer } from "mobx-react";
 // plane imports
 import { cn } from "@plane/utils";
 import { AppRailRoot } from "@/components/navigation";
+import { StickyActionBar } from "@/components/stickies/action-bar";
 import { useAppRailVisibility } from "@/lib/app-rail";
 // local imports
 import { TopNavigationRoot } from "../navigations";
@@ -31,6 +32,10 @@ export const WorkspaceContentWrapper = observer(function WorkspaceContentWrapper
         >
           {children}
         </div>
+      </div>
+      {/* Sticky Action Bar - Fixed position bottom right */}
+      <div className="fixed bottom-6 right-6 z-50">
+        <StickyActionBar />
       </div>
     </div>
   );
