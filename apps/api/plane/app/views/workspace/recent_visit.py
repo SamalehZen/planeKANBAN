@@ -28,5 +28,5 @@ class UserRecentVisitViewSet(BaseViewSet):
 
         user_recent_visits = user_recent_visits.filter(entity_name__in=["issue", "page", "project"])
 
-        serializer = WorkspaceRecentVisitSerializer(user_recent_visits[:20], many=True)
+        serializer = WorkspaceRecentVisitSerializer(user_recent_visits[:20], many=True, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
