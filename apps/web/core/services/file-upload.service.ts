@@ -17,9 +17,6 @@ export class FileUploadService extends APIService {
   ): Promise<void> {
     this.cancelSource = axios.CancelToken.source();
     return this.post(url, data, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
       cancelToken: this.cancelSource.token,
       withCredentials: false,
       onUploadProgress: uploadProgressHandler,
