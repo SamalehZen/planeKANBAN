@@ -283,9 +283,10 @@ class WorkspaceRecentVisitSerializer(BaseSerializer):
         if entity_model and entity_serializer:
             try:
                 entity = entity_model.objects.get(pk=entity_identifier)
-
                 return entity_serializer(entity).data
             except entity_model.DoesNotExist:
+                return None
+            except Exception:
                 return None
         return None
 
