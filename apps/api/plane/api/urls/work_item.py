@@ -11,6 +11,7 @@ from plane.api.views import (
     IssueActivityDetailAPIEndpoint,
     IssueAttachmentListCreateAPIEndpoint,
     IssueAttachmentDetailAPIEndpoint,
+    IssueAttachmentProxyUploadEndpoint,
     WorkspaceIssueAPIEndpoint,
     IssueSearchEndpoint,
 )
@@ -140,6 +141,11 @@ new_url_patterns = [
         "workspaces/<str:slug>/projects/<uuid:project_id>/work-items/<uuid:issue_id>/attachments/<uuid:pk>/",
         IssueAttachmentDetailAPIEndpoint.as_view(http_method_names=["get", "patch", "delete"]),
         name="work-item-attachment-detail",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/work-items/<uuid:issue_id>/attachments/proxy-upload/",
+        IssueAttachmentProxyUploadEndpoint.as_view(http_method_names=["post"]),
+        name="work-item-attachment-proxy-upload",
     ),
 ]
 
