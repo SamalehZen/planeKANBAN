@@ -30,7 +30,18 @@ export class Server {
     this.setupMiddleware();
     this.router = express.Router();
     this.app.set("port", env.PORT || 3000);
+    this.setupRootHealthCheck();
     this.app.use(env.LIVE_BASE_PATH, this.router);
+  }
+
+  private setupRootHealthCheck() {
+    this.app.get("/", (_req: Request, res: Response) => {
+      res.status(200).json({
+        status: "OK",
+        service: "plane-live",
+        timestamp: new Date().toISOString(),
+      });
+    });
   }
 
   public async initialize(): Promise<void> {
