@@ -16,9 +16,9 @@ UptimeRobot envoie des requêtes HTTP toutes les 5-10 minutes pour maintenir les
 
 | Service | URL | Méthode | Réponse attendue |
 |---------|-----|---------|------------------|
-| plane-api | `https://plane-api.onrender.com/` | GET | `{"status": "OK"}` |
-| plane-live | `https://plane-live.onrender.com/` | GET | `{"status": "OK", ...}` |
-| plane-space | `https://plane-space.onrender.com/health` | GET | `{"status": "OK", ...}` |
+| plane-api | `https://plane-api-6urj.onrender.com/` | GET | `{"status": "OK"}` |
+| plane-live | `https://plane-live-x3iu.onrender.com/` | GET | `{"status": "OK", ...}` |
+| plane-space | `https://plane-space-huu9.onrender.com/health` | GET | `{"status": "OK", ...}` |
 
 > **Note**: plane-live a aussi `/live/health` disponible, mais `/` est plus simple pour le monitoring.
 
@@ -47,7 +47,7 @@ UptimeRobot envoie des requêtes HTTP toutes les 5-10 minutes pour maintenir les
    |-------|--------|
    | Monitor Type | HTTP(s) |
    | Friendly Name | `Plane API` |
-   | URL (or IP) | `https://plane-api.onrender.com/` |
+   | URL (or IP) | `https://plane-api-6urj.onrender.com/` |
    | Monitoring Interval | `5 minutes` ⚠️ |
 
 4. Section **"Alert Contacts To Notify"**:
@@ -64,7 +64,7 @@ UptimeRobot envoie des requêtes HTTP toutes les 5-10 minutes pour maintenir les
    |-------|--------|
    | Monitor Type | HTTP(s) |
    | Friendly Name | `Plane Live` |
-   | URL (or IP) | `https://plane-live.onrender.com/` |
+   | URL (or IP) | `https://plane-live-x3iu.onrender.com/` |
    | Monitoring Interval | `5 minutes` |
 
 3. Cocher l'alerte email
@@ -79,7 +79,7 @@ UptimeRobot envoie des requêtes HTTP toutes les 5-10 minutes pour maintenir les
    |-------|--------|
    | Monitor Type | HTTP(s) |
    | Friendly Name | `Plane Space` |
-   | URL (or IP) | `https://plane-space.onrender.com/health` |
+   | URL (or IP) | `https://plane-space-huu9.onrender.com/health` |
    | Monitoring Interval | `5 minutes` |
 
 3. Cocher l'alerte email
@@ -121,9 +121,9 @@ Dans les paramètres du monitor, vous pouvez activer:
 
 ```bash
 # Tester les endpoints
-curl -s https://plane-api.onrender.com/ | jq
-curl -s https://plane-live.onrender.com/ | jq
-curl -s https://plane-space.onrender.com/health | jq
+curl -s https://plane-api-6urj.onrender.com/ | jq
+curl -s https://plane-live-x3iu.onrender.com/ | jq
+curl -s https://plane-space-huu9.onrender.com/health | jq
 ```
 
 Réponses attendues:
@@ -139,9 +139,9 @@ Réponses attendues:
 
 | # | Service | URL à surveiller | Intervalle |
 |---|---------|-----------------|------------|
-| 1 | Plane API | `https://plane-api.onrender.com/` | 5 min |
-| 2 | Plane Live | `https://plane-live.onrender.com/` | 5 min |
-| 3 | Plane Space | `https://plane-space.onrender.com/health` | 5 min |
+| 1 | Plane API | `https://plane-api-6urj.onrender.com/` | 5 min |
+| 2 | Plane Live | `https://plane-live-x3iu.onrender.com/` | 5 min |
+| 3 | Plane Space | `https://plane-space-huu9.onrender.com/health` | 5 min |
 
 ---
 

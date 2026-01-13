@@ -100,11 +100,11 @@ Les secrets sont générés automatiquement :
 
 ### Étape 5 — Vérifications
 - Ouvrir :
-  - `https://plane-web.onrender.com`
-  - `https://plane-admin.onrender.com`
-  - `https://plane-space.onrender.com`
-  - `https://plane-api.onrender.com`
-  - `https://plane-live.onrender.com`
+  - `https://plane-web-32l5.onrender.com`
+  - `https://plane-admin-ztbn.onrender.com`
+  - `https://plane-space-huu9.onrender.com`
+  - `https://plane-api-6urj.onrender.com`
+  - `https://plane-live-x3iu.onrender.com`
 - Vérifier les logs :
   - `plane-api`: migrations, collectstatic, démarrage gunicorn
   - `plane-worker`: worker + beat

@@ -329,7 +329,7 @@ LIVE_SERVER_SECRET_KEY=<same as plane-api>
 ### 4.5.3 Variables `plane-live`
 
 ```bash
-API_BASE_URL=https://plane-api.onrender.com
+API_BASE_URL=https://plane-api-6urj.onrender.com
 LIVE_BASE_PATH=/live
 LIVE_SERVER_SECRET_KEY=<same as plane-api>
 
@@ -337,57 +337,57 @@ LIVE_SERVER_SECRET_KEY=<same as plane-api>
 REDIS_URL=rediss://default:xxx@eu1-xxx-xxx.upstash.io:6379/0
 
 # CORS (optionnel)
-CORS_ALLOWED_ORIGINS=https://plane-web.onrender.com,https://plane-admin.onrender.com,https://plane-space.onrender.com
+CORS_ALLOWED_ORIGINS=https://plane-web-32l5.onrender.com,https://plane-admin-ztbn.onrender.com,https://plane-space-huu9.onrender.com
 ```
 
 ### 4.5.4 Variables `plane-web`
 
 ```bash
-VITE_API_BASE_URL=https://plane-api.onrender.com
+VITE_API_BASE_URL=https://plane-api-6urj.onrender.com
 
-VITE_WEB_BASE_URL=https://plane-web.onrender.com
+VITE_WEB_BASE_URL=https://plane-web-32l5.onrender.com
 
-VITE_ADMIN_BASE_URL=https://plane-admin.onrender.com
+VITE_ADMIN_BASE_URL=https://plane-admin-ztbn.onrender.com
 VITE_ADMIN_BASE_PATH=/god-mode
 
-VITE_SPACE_BASE_URL=https://plane-space.onrender.com
+VITE_SPACE_BASE_URL=https://plane-space-huu9.onrender.com
 VITE_SPACE_BASE_PATH=/spaces
 
-VITE_LIVE_BASE_URL=https://plane-live.onrender.com
+VITE_LIVE_BASE_URL=https://plane-live-x3iu.onrender.com
 VITE_LIVE_BASE_PATH=/live
 ```
 
 ### 4.5.5 Variables `plane-admin`
 
 ```bash
-VITE_API_BASE_URL=https://plane-api.onrender.com
+VITE_API_BASE_URL=https://plane-api-6urj.onrender.com
 
-VITE_WEB_BASE_URL=https://plane-web.onrender.com
+VITE_WEB_BASE_URL=https://plane-web-32l5.onrender.com
 
-VITE_ADMIN_BASE_URL=https://plane-admin.onrender.com
+VITE_ADMIN_BASE_URL=https://plane-admin-ztbn.onrender.com
 VITE_ADMIN_BASE_PATH=/god-mode
 
-VITE_SPACE_BASE_URL=https://plane-space.onrender.com
+VITE_SPACE_BASE_URL=https://plane-space-huu9.onrender.com
 VITE_SPACE_BASE_PATH=/spaces
 
-VITE_LIVE_BASE_URL=https://plane-live.onrender.com
+VITE_LIVE_BASE_URL=https://plane-live-x3iu.onrender.com
 VITE_LIVE_BASE_PATH=/live
 ```
 
 ### 4.5.6 Variables `plane-space`
 
 ```bash
-VITE_API_BASE_URL=https://plane-api.onrender.com
+VITE_API_BASE_URL=https://plane-api-6urj.onrender.com
 
-VITE_WEB_BASE_URL=https://plane-web.onrender.com
+VITE_WEB_BASE_URL=https://plane-web-32l5.onrender.com
 
-VITE_ADMIN_BASE_URL=https://plane-admin.onrender.com
+VITE_ADMIN_BASE_URL=https://plane-admin-ztbn.onrender.com
 VITE_ADMIN_BASE_PATH=/god-mode
 
-VITE_SPACE_BASE_URL=https://plane-space.onrender.com
+VITE_SPACE_BASE_URL=https://plane-space-huu9.onrender.com
 VITE_SPACE_BASE_PATH=/spaces
 
-VITE_LIVE_BASE_URL=https://plane-live.onrender.com
+VITE_LIVE_BASE_URL=https://plane-live-x3iu.onrender.com
 VITE_LIVE_BASE_PATH=/live
 ```
 
@@ -399,7 +399,7 @@ VITE_LIVE_BASE_PATH=/live
 L’endpoint de health check de l’API (dans ce repo) répond sur la racine `/` :
 
 ```bash
-curl https://plane-api.onrender.com/
+curl https://plane-api-6urj.onrender.com/
 ```
 
 Réponse attendue :
@@ -411,7 +411,7 @@ Réponse attendue :
 ### 5.2 Tester le Live server
 
 ```bash
-curl https://plane-live.onrender.com/health/
+curl https://plane-live-x3iu.onrender.com/health/
 ```
 
 ### 5.3 Accéder aux interfaces
