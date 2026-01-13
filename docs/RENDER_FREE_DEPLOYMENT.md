@@ -217,8 +217,10 @@ corepack enable && PORT=$PORT pnpm --filter space exec react-router-serve ./buil
 - Build Command :
 
 ```bash
-corepack enable && pnpm install --frozen-lockfile && pnpm --filter live build
+corepack enable && corepack prepare pnpm@10.24.0 --activate && pnpm install --frozen-lockfile && pnpm turbo run build --filter=live
 ```
+
+> **Important** : Utiliser `pnpm turbo run build --filter=live` au lieu de `pnpm --filter live build` pour construire automatiquement les dépendances (@plane/types, @plane/logger, @plane/decorators, @plane/editor).
 
 - Start Command :
 
