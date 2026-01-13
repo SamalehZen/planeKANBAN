@@ -17,8 +17,10 @@ UptimeRobot envoie des requêtes HTTP toutes les 5-10 minutes pour maintenir les
 | Service | URL | Méthode | Réponse attendue |
 |---------|-----|---------|------------------|
 | plane-api | `https://plane-api.onrender.com/` | GET | `{"status": "OK"}` |
-| plane-live | `https://plane-live.onrender.com/health` | GET | `{"status": "OK", ...}` |
+| plane-live | `https://plane-live.onrender.com/` | GET | `{"status": "OK", ...}` |
 | plane-space | `https://plane-space.onrender.com/health` | GET | `{"status": "OK", ...}` |
+
+> **Note**: plane-live a aussi `/live/health` disponible, mais `/` est plus simple pour le monitoring.
 
 > **Note**: Les sites statiques (`plane-web`, `plane-admin`) ne nécessitent pas de ping car ils ne s'éteignent jamais.
 
@@ -62,7 +64,7 @@ UptimeRobot envoie des requêtes HTTP toutes les 5-10 minutes pour maintenir les
    |-------|--------|
    | Monitor Type | HTTP(s) |
    | Friendly Name | `Plane Live` |
-   | URL (or IP) | `https://plane-live.onrender.com/health` |
+   | URL (or IP) | `https://plane-live.onrender.com/` |
    | Monitoring Interval | `5 minutes` |
 
 3. Cocher l'alerte email
@@ -120,7 +122,7 @@ Dans les paramètres du monitor, vous pouvez activer:
 ```bash
 # Tester les endpoints
 curl -s https://plane-api.onrender.com/ | jq
-curl -s https://plane-live.onrender.com/health | jq
+curl -s https://plane-live.onrender.com/ | jq
 curl -s https://plane-space.onrender.com/health | jq
 ```
 
@@ -138,7 +140,7 @@ Réponses attendues:
 | # | Service | URL à surveiller | Intervalle |
 |---|---------|-----------------|------------|
 | 1 | Plane API | `https://plane-api.onrender.com/` | 5 min |
-| 2 | Plane Live | `https://plane-live.onrender.com/health` | 5 min |
+| 2 | Plane Live | `https://plane-live.onrender.com/` | 5 min |
 | 3 | Plane Space | `https://plane-space.onrender.com/health` | 5 min |
 
 ---
