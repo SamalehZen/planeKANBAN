@@ -28,8 +28,12 @@ export class IssueAttachmentService extends APIService {
     return this.patch(
       `/api/assets/v2/workspaces/${workspaceSlug}/projects/${projectId}/${this.serviceType}/${issueId}/attachments/${attachmentId}/`
     )
-      .then((response) => response?.data)
+      .then((response) => {
+        console.log("[AttachmentUpload] PATCH response:", response);
+        return response?.data;
+      })
       .catch((error) => {
+        console.error("[AttachmentUpload] PATCH failed:", error?.response?.status, error?.response?.data);
         throw error?.response?.data;
       });
   }
@@ -47,18 +51,40 @@ export class IssueAttachmentService extends APIService {
       fileMetaData
     )
       .then(async (response) => {
+        console.log("[AttachmentUpload] Step 1: Received presigned URL response", response?.data);
         const signedURLResponse: TIssueAttachmentUploadResponse = response?.data;
+        
+        if (!signedURLResponse?.upload_data?.url) {
+          console.error("[AttachmentUpload] Error: Missing upload_data.url in response", signedURLResponse);
+          throw new Error("Invalid response: missing upload_data.url");
+        }
+        
+        if (!signedURLResponse?.attachment) {
+          console.error("[AttachmentUpload] Error: Missing attachment in response", signedURLResponse);
+          throw new Error("Invalid response: missing attachment");
+        }
+        
+        console.log("[AttachmentUpload] Step 2: Generating upload payload");
         const fileUploadPayload = generateFileUploadPayload(signedURLResponse, file);
+        
+        console.log("[AttachmentUpload] Step 3: Uploading file to storage", signedURLResponse.upload_data.url);
         await this.fileUploadService.uploadFile(
           signedURLResponse.upload_data.url,
           fileUploadPayload,
           uploadProgressHandler
         );
+        
+        console.log("[AttachmentUpload] Step 4: Updating attachment status", signedURLResponse.asset_id);
         await this.updateIssueAttachmentUploadStatus(workspaceSlug, projectId, issueId, signedURLResponse.asset_id);
+        
+        console.log("[AttachmentUpload] Step 5: Upload complete", signedURLResponse.attachment);
         return signedURLResponse.attachment;
       })
       .catch((error) => {
-        throw error?.response?.data;
+        console.error("[AttachmentUpload] Upload failed with error:", error);
+        console.error("[AttachmentUpload] Error response status:", error?.response?.status);
+        console.error("[AttachmentUpload] Error data:", error?.response?.data);
+        throw error?.response?.data || error;
       });
   }
 

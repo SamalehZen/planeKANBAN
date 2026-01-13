@@ -123,16 +123,26 @@ class IssueAttachmentV2Endpoint(BaseAPIView):
         # Generate a presigned URL to share an S3 object
         presigned_url = storage.generate_presigned_post(object_name=asset_key, file_type=type, file_size=size_limit)
 
+        # Serialize the attachment
+        attachment_data = IssueAttachmentSerializer(asset).data
+        
+        # Prepare response
+        response_data = {
+            "upload_data": presigned_url,
+            "asset_id": str(asset.id),
+            "attachment": attachment_data,
+            "asset_url": asset.asset_url,
+        }
+        
+        # Debug logging
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"[AttachmentUpload] POST Response - asset_id: {asset.id}")
+        logger.info(f"[AttachmentUpload] presigned_url keys: {presigned_url.keys() if presigned_url else 'None'}")
+        logger.info(f"[AttachmentUpload] attachment keys: {attachment_data.keys() if attachment_data else 'None'}")
+        
         # Return the presigned URL
-        return Response(
-            {
-                "upload_data": presigned_url,
-                "asset_id": str(asset.id),
-                "attachment": IssueAttachmentSerializer(asset).data,
-                "asset_url": asset.asset_url,
-            },
-            status=status.HTTP_200_OK,
-        )
+        return Response(response_data, status=status.HTTP_200_OK)
 
     @allow_permission([ROLE.ADMIN], creator=True, model=FileAsset)
     def delete(self, request, slug, project_id, issue_id, pk):
@@ -190,11 +200,16 @@ class IssueAttachmentV2Endpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def patch(self, request, slug, project_id, issue_id, pk):
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"[AttachmentUpload] PATCH Request - asset_id: {pk}")
+        
         issue_attachment = FileAsset.objects.get(pk=pk, workspace__slug=slug, project_id=project_id)
         serializer = IssueAttachmentSerializer(issue_attachment)
 
         # Send this activity only if the attachment is not uploaded before
         if not issue_attachment.is_uploaded:
+            logger.info(f"[AttachmentUpload] Marking attachment as uploaded: {pk}")
             issue_activity.delay(
                 type="attachment.activity.created",
                 requested_data=None,
@@ -210,9 +225,12 @@ class IssueAttachmentV2Endpoint(BaseAPIView):
             # Update the attachment
             issue_attachment.is_uploaded = True
             issue_attachment.created_by = request.user
+        else:
+            logger.info(f"[AttachmentUpload] Attachment already uploaded: {pk}")
 
         # Get the storage metadata
         if not issue_attachment.storage_metadata:
             get_asset_object_metadata.delay(str(issue_attachment.id))
         issue_attachment.save()
+        logger.info(f"[AttachmentUpload] PATCH Complete - asset_id: {pk}")
         return Response(status=status.HTTP_204_NO_CONTENT)
