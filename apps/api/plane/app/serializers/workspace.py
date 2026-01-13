@@ -282,45 +282,11 @@ class WorkspaceRecentVisitSerializer(BaseSerializer):
 
         if entity_model and entity_serializer:
             try:
-                if entity_name == "project":
-                    from plane.db.models import ProjectMember
-                    
-                    entity = entity_model.objects.get(
-                        pk=entity_identifier,
-                        archived_at__isnull=True
-                    )
-                    
-                    request = self.context.get('request')
-                    if request and request.user:
-                        is_member = ProjectMember.objects.filter(
-                            project_id=entity_identifier,
-                            member_id=request.user.id,
-                            is_active=True
-                        ).exists()
-                        
-                        if not is_member:
-                            return None
-                elif entity_name == "issue":
-                    entity = entity_model.objects.select_related('project').get(pk=entity_identifier)
-                    
-                    if entity.project and entity.project.archived_at is not None:
-                        return None
-                elif entity_name == "page":
-                    entity = entity_model.objects.prefetch_related('projects').get(
-                        pk=entity_identifier,
-                        archived_at__isnull=True
-                    )
-                    
-                    projects = list(entity.projects.all())
-                    if projects:
-                        all_archived = all(p.archived_at is not None for p in projects)
-                        if all_archived:
-                            return None
-                else:
-                    entity = entity_model.objects.get(pk=entity_identifier)
-
+                entity = entity_model.objects.get(pk=entity_identifier)
                 return entity_serializer(entity).data
             except entity_model.DoesNotExist:
+                return None
+            except Exception:
                 return None
         return None
 
