@@ -59,8 +59,8 @@ class AnthropicProvider(LLMProvider):
 
 class GeminiProvider(LLMProvider):
     name = "Gemini"
-    models = ["gemini-pro", "gemini-1.5-pro-latest", "gemini-1.5-flash-latest", "gemini-pro-vision"]
-    default_model = "gemini-1.5-flash-latest"
+    models = ["gemini-3-flash-preview", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"]
+    default_model = "gemini-3-flash-preview"
 
 
 SUPPORTED_PROVIDERS = {
@@ -124,11 +124,22 @@ def get_llm_response(task, prompt, api_key: str, model: str, provider: str) -> T
     try:
         if provider.lower() == "gemini":
             # Use Google Generative AI SDK for Gemini
+            import logging
+            logger = logging.getLogger("plane.ai")
+            logger.info(f"[AI Gemini] Using model: {model}")
+            
             genai.configure(api_key=api_key)
             gemini_model = genai.GenerativeModel(model)
             response = gemini_model.generate_content(final_text)
+            
+            if not response or not response.text:
+                logger.error("[AI Gemini] Empty response from Gemini API")
+                return None, "Empty response from Gemini"
+            
             text = response.text
+            logger.info(f"[AI Gemini] Success - Response length: {len(text)}")
             return text, None
+            
         elif provider.lower() == "anthropic":
             # Anthropic uses OpenAI-compatible API format
             client = OpenAI(api_key=api_key, base_url="https://api.anthropic.com/v1")
@@ -147,13 +158,21 @@ def get_llm_response(task, prompt, api_key: str, model: str, provider: str) -> T
             return text, None
     except Exception as e:
         log_exception(e)
+        import logging
+        logger = logging.getLogger("plane.ai")
+        logger.error(f"[AI Error] Provider: {provider}, Model: {model}, Error: {str(e)}")
+        
         error_type = e.__class__.__name__
-        if error_type in ["AuthenticationError", "InvalidApiKey", "PermissionDenied"]:
+        error_msg = str(e)
+        
+        if error_type in ["AuthenticationError", "InvalidApiKey", "PermissionDenied"] or "API key" in error_msg:
             return None, f"Invalid API key for {provider}"
-        elif error_type in ["RateLimitError", "ResourceExhausted"]:
+        elif error_type in ["RateLimitError", "ResourceExhausted"] or "quota" in error_msg.lower():
             return None, f"Rate limit exceeded for {provider}"
+        elif "model" in error_msg.lower() and "not found" in error_msg.lower():
+            return None, f"Model {model} not found for {provider}. Please check the model name."
         else:
-            return None, f"Error occurred while generating response from {provider}"
+            return None, f"Error: {error_msg}"
 
 
 class GPTIntegrationEndpoint(BaseAPIView):

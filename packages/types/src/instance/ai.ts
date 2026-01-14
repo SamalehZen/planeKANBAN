@@ -10,8 +10,8 @@ export const LLM_PROVIDERS: Record<TLLMProvider, { name: string; models: string[
   },
   gemini: {
     name: "Google Gemini",
-    models: ["gemini-pro", "gemini-1.5-pro-latest", "gemini-1.5-flash-latest", "gemini-pro-vision"],
-    defaultModel: "gemini-1.5-flash-latest",
+    models: ["gemini-3-flash-preview", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"],
+    defaultModel: "gemini-3-flash-preview",
   },
   anthropic: {
     name: "Anthropic Claude",
