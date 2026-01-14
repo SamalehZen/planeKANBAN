@@ -102,6 +102,7 @@ from .asset.base import FileAssetEndpoint, UserAssetsEndpoint, FileAssetViewSet
 from .asset.v2 import (
     WorkspaceFileAssetEndpoint,
     UserAssetsV2Endpoint,
+    UserAssetsV2ProxyUploadEndpoint,
     StaticFileAssetEndpoint,
     AssetRestoreEndpoint,
     ProjectAssetEndpoint,

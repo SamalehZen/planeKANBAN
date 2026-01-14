@@ -179,17 +179,20 @@ export class FileService extends APIService {
   }
 
   async uploadUserAsset(data: TFileEntityInfo, file: File): Promise<TFileSignedURLResponse> {
-    const fileMetaData = await getFileMetaDataForUpload(file);
-    return this.post(`/api/assets/v2/user-assets/`, {
-      ...data,
-      ...fileMetaData,
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("entity_type", data.entity_type);
+
+    return this.post(`/api/assets/v2/user-assets/proxy-upload/`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
     })
-      .then(async (response) => {
-        const signedURLResponse: TFileSignedURLResponse = response?.data;
-        const fileUploadPayload = generateFileUploadPayload(signedURLResponse, file);
-        await this.fileUploadService.uploadFile(signedURLResponse.upload_data.url, fileUploadPayload);
-        await this.updateUserAssetUploadStatus(signedURLResponse.asset_id);
-        return signedURLResponse;
+      .then((response) => {
+        const proxyResponse = response?.data;
+        return {
+          asset_id: proxyResponse.asset_id,
+          asset_url: proxyResponse.asset_url,
+          upload_data: { url: "", fields: {} },
+        } as TFileSignedURLResponse;
       })
       .catch((error) => {
         throw error?.response?.data;
