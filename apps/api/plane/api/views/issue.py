@@ -27,6 +27,9 @@ from django.conf import settings
 from rest_framework import status
 from rest_framework.response import Response
 
+# Authentication
+from plane.authentication.session import BaseSessionAuthentication
+
 # drf-spectacular imports
 from drf_spectacular.utils import (
     extend_schema,
@@ -2143,6 +2146,9 @@ class IssueAttachmentProxyUploadEndpoint(BaseAPIView):
     Proxy upload endpoint for issue attachments.
     Uploads files through the server to R2/S3, bypassing CORS issues.
     """
+    authentication_classes = [
+        BaseSessionAuthentication,
+    ]
 
     def post(self, request, slug, project_id, issue_id):
         issue = Issue.objects.get(pk=issue_id, workspace__slug=slug, project_id=project_id)
