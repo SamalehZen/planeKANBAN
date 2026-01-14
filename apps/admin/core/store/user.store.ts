@@ -76,18 +76,23 @@ export class UserStore implements IUserStore {
       }
       return currentUser;
     } catch (error: any) {
-      this.isLoading = false;
-      this.isUserLoggedIn = false;
-      if (error.status === 403)
-        this.userStatus = {
-          status: EUserStatus.AUTHENTICATION_NOT_DONE,
-          message: error?.message || "",
-        };
-      else
-        this.userStatus = {
-          status: EUserStatus.ERROR,
-          message: error?.message || "",
-        };
+      const status = error?.status || error?.response?.status;
+      runInAction(() => {
+        this.isLoading = false;
+        this.isUserLoggedIn = false;
+        if (status === 401 || status === 403) {
+          removeAdminToken();
+          this.userStatus = {
+            status: EUserStatus.AUTHENTICATION_NOT_DONE,
+            message: "Session expired. Please sign in again.",
+          };
+        } else {
+          this.userStatus = {
+            status: EUserStatus.ERROR,
+            message: error?.message || "An error occurred",
+          };
+        }
+      });
       throw error;
     }
   };
