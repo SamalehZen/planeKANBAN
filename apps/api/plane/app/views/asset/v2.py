@@ -194,6 +194,118 @@ class UserAssetsV2Endpoint(BaseAPIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+class UserAssetsV2ProxyUploadEndpoint(BaseAPIView):
+    """
+    Proxy upload endpoint for user assets (avatar/cover).
+    Uploads files through the server to R2/S3, bypassing CORS issues.
+    """
+
+    def asset_delete(self, asset_id):
+        asset = FileAsset.objects.filter(id=asset_id).first()
+        if asset is None:
+            return
+        asset.is_deleted = True
+        asset.deleted_at = timezone.now()
+        asset.save(update_fields=["is_deleted", "deleted_at"])
+
+    def entity_asset_save(self, asset_id, entity_type, asset, request):
+        if entity_type == FileAsset.EntityTypeContext.USER_AVATAR:
+            user = User.objects.get(id=asset.user_id)
+            user.avatar = ""
+            if user.avatar_asset_id:
+                self.asset_delete(user.avatar_asset_id)
+            user.avatar_asset_id = asset_id
+            user.save()
+            invalidate_cache_directly(path="/api/users/me/", url_params=False, user=True, request=request)
+            invalidate_cache_directly(path="/api/users/me/settings/", url_params=False, user=True, request=request)
+        elif entity_type == FileAsset.EntityTypeContext.USER_COVER:
+            user = User.objects.get(id=asset.user_id)
+            user.cover_image = None
+            if user.cover_image_asset_id:
+                self.asset_delete(user.cover_image_asset_id)
+            user.cover_image_asset_id = asset_id
+            user.save()
+            invalidate_cache_directly(path="/api/users/me/", url_params=False, user=True, request=request)
+            invalidate_cache_directly(path="/api/users/me/settings/", url_params=False, user=True, request=request)
+
+    def post(self, request):
+        uploaded_file = request.FILES.get("file")
+        if not uploaded_file:
+            return Response(
+                {"error": "No file provided.", "status": False},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        entity_type = request.data.get("entity_type")
+        if entity_type not in ["USER_AVATAR", "USER_COVER"]:
+            return Response(
+                {"error": "Invalid entity type.", "status": False},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        content_type = uploaded_file.content_type
+        allowed_types = ["image/jpeg", "image/png", "image/webp", "image/jpg", "image/gif"]
+        if content_type not in allowed_types:
+            return Response(
+                {"error": "Invalid file type. Only JPEG, PNG, WebP, JPG and GIF files are allowed.", "status": False},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        file_size = uploaded_file.size
+        size_limit = settings.FILE_SIZE_LIMIT
+        if file_size > size_limit:
+            return Response(
+                {"error": f"File size exceeds limit of {size_limit} bytes.", "status": False},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        asset_key = f"{uuid.uuid4().hex}-{uploaded_file.name}"
+
+        asset = FileAsset.objects.create(
+            attributes={"name": uploaded_file.name, "type": content_type, "size": file_size},
+            asset=asset_key,
+            size=file_size,
+            user=request.user,
+            created_by=request.user,
+            entity_type=entity_type,
+        )
+
+        storage = S3Storage(request=request, is_server=True)
+        upload_success = storage.upload_file(
+            file_obj=uploaded_file,
+            object_name=asset_key,
+            content_type=content_type,
+        )
+
+        if not upload_success:
+            asset.delete()
+            return Response(
+                {"error": "Failed to upload file to storage.", "status": False},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        asset.is_uploaded = True
+        asset.save(update_fields=["is_uploaded"])
+
+        self.entity_asset_save(
+            asset_id=asset.id,
+            entity_type=asset.entity_type,
+            asset=asset,
+            request=request,
+        )
+
+        get_asset_object_metadata.delay(asset_id=str(asset.id))
+
+        return Response(
+            {
+                "asset_id": str(asset.id),
+                "asset_url": asset.asset_url,
+                "status": True,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
 class WorkspaceFileAssetEndpoint(BaseAPIView):
     """This endpoint is used to upload cover images/logos etc for workspace, projects and users."""
 

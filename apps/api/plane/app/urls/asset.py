@@ -8,6 +8,7 @@ from plane.app.views import (
     # V2 Endpoints
     WorkspaceFileAssetEndpoint,
     UserAssetsV2Endpoint,
+    UserAssetsV2ProxyUploadEndpoint,
     StaticFileAssetEndpoint,
     AssetRestoreEndpoint,
     ProjectAssetEndpoint,
@@ -57,6 +58,11 @@ urlpatterns = [
         "assets/v2/user-assets/",
         UserAssetsV2Endpoint.as_view(),
         name="user-file-assets",
+    ),
+    path(
+        "assets/v2/user-assets/proxy-upload/",
+        UserAssetsV2ProxyUploadEndpoint.as_view(),
+        name="user-proxy-upload",
     ),
     path(
         "assets/v2/user-assets/<uuid:asset_id>/",
