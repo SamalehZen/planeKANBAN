@@ -735,6 +735,78 @@ class ProjectAssetEndpoint(BaseAPIView):
         return HttpResponseRedirect(signed_url)
 
 
+class ProjectAssetProxyUploadEndpoint(BaseAPIView):
+    """
+    Proxy upload endpoint for project assets (editor images).
+    Uploads files through the server to R2/S3, bypassing CORS issues.
+    """
+
+    def get_entity_id_field(self, entity_type, entity_id):
+        if entity_type in [FileAsset.EntityTypeContext.ISSUE_ATTACHMENT, FileAsset.EntityTypeContext.ISSUE_DESCRIPTION]:
+            return {"issue_id": entity_id}
+        if entity_type == FileAsset.EntityTypeContext.PAGE_DESCRIPTION:
+            return {"page_id": entity_id}
+        if entity_type == FileAsset.EntityTypeContext.COMMENT_DESCRIPTION:
+            return {"comment_id": entity_id}
+        if entity_type == FileAsset.EntityTypeContext.DRAFT_ISSUE_DESCRIPTION:
+            return {"draft_issue_id": entity_id}
+        return {}
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
+    def post(self, request, slug, project_id):
+        uploaded_file = request.FILES.get("file")
+        if not uploaded_file:
+            return Response({"error": "No file provided.", "status": False}, status=status.HTTP_400_BAD_REQUEST)
+
+        entity_type = request.data.get("entity_type", "")
+        entity_identifier = request.data.get("entity_identifier")
+
+        if entity_type not in FileAsset.EntityTypeContext.values:
+            return Response({"error": "Invalid entity type.", "status": False}, status=status.HTTP_400_BAD_REQUEST)
+
+        content_type = uploaded_file.content_type
+        allowed_types = ["image/jpeg", "image/png", "image/webp", "image/jpg", "image/gif"]
+        if content_type not in allowed_types:
+            return Response(
+                {"error": "Invalid file type. Only JPEG, PNG, WebP, JPG and GIF files are allowed.", "status": False},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        file_size = uploaded_file.size
+        if file_size > settings.FILE_SIZE_LIMIT:
+            return Response(
+                {"error": f"File size exceeds limit of {settings.FILE_SIZE_LIMIT} bytes.", "status": False},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        workspace = Workspace.objects.get(slug=slug)
+        asset_key = f"{workspace.id}/{uuid.uuid4().hex}-{uploaded_file.name}"
+
+        asset = FileAsset.objects.create(
+            attributes={"name": uploaded_file.name, "type": content_type, "size": file_size},
+            asset=asset_key,
+            size=file_size,
+            workspace=workspace,
+            project_id=project_id,
+            created_by=request.user,
+            entity_type=entity_type,
+            **self.get_entity_id_field(entity_type=entity_type, entity_id=entity_identifier),
+        )
+
+        storage = S3Storage(request=request, is_server=True)
+        upload_success = storage.upload_file(file_obj=uploaded_file, object_name=asset_key, content_type=content_type)
+
+        if not upload_success:
+            asset.delete()
+            return Response({"error": "Failed to upload file to storage.", "status": False}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        asset.is_uploaded = True
+        asset.save(update_fields=["is_uploaded"])
+        get_asset_object_metadata.delay(asset_id=str(asset.id))
+
+        return Response({"asset_id": str(asset.id), "asset_url": asset.asset_url, "status": True}, status=status.HTTP_200_OK)
+
+
 class ProjectBulkAssetEndpoint(BaseAPIView):
     def save_project_cover(self, asset, project_id):
         project = Project.objects.get(id=project_id)

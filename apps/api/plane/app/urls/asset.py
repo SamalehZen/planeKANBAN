@@ -12,6 +12,7 @@ from plane.app.views import (
     StaticFileAssetEndpoint,
     AssetRestoreEndpoint,
     ProjectAssetEndpoint,
+    ProjectAssetProxyUploadEndpoint,
     ProjectBulkAssetEndpoint,
     AssetCheckEndpoint,
     DuplicateAssetEndpoint,
@@ -83,6 +84,11 @@ urlpatterns = [
         "assets/v2/workspaces/<str:slug>/projects/<uuid:project_id>/",
         ProjectAssetEndpoint.as_view(),
         name="bulk-asset-update",
+    ),
+    path(
+        "assets/v2/workspaces/<str:slug>/projects/<uuid:project_id>/proxy-upload/",
+        ProjectAssetProxyUploadEndpoint.as_view(),
+        name="project-proxy-upload",
     ),
     path(
         "assets/v2/workspaces/<str:slug>/projects/<uuid:project_id>/<uuid:pk>/",

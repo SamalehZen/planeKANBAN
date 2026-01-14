@@ -106,6 +106,7 @@ from .asset.v2 import (
     StaticFileAssetEndpoint,
     AssetRestoreEndpoint,
     ProjectAssetEndpoint,
+    ProjectAssetProxyUploadEndpoint,
     ProjectBulkAssetEndpoint,
     AssetCheckEndpoint,
     DuplicateAssetEndpoint,
