@@ -5,7 +5,7 @@ from django.db import IntegrityError
 from django.db.models import OuterRef, Func, F
 
 # Module imports
-from plane.app.views.base import BaseAPIView
+from .base import BaseAPIView
 from plane.license.api.permissions import InstanceAdminPermission
 from plane.db.models import Workspace, WorkspaceMember, Project
 from plane.license.api.serializers import WorkspaceSerializer
