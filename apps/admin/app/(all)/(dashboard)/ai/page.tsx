@@ -19,7 +19,8 @@ const InstanceAIPage = observer(function InstanceAIPage(_props: Route.ComponentP
         <div className="border-b border-subtle mx-4 py-4 space-y-1 flex-shrink-0">
           <div className="text-18 font-medium text-primary">AI features for all your workspaces</div>
           <div className="text-13 font-regular text-tertiary">
-            Configure your AI API credentials so Plane AI features are turned on for all your workspaces.
+            Configure your AI provider (OpenAI, Google Gemini, or Anthropic Claude) to enable AI features across all
+            workspaces. AI helps with writing, grammar, translations, and intelligent assistance.
           </div>
         </div>
         <div className="flex-grow overflow-hidden overflow-y-scroll vertical-scrollbar scrollbar-md px-4">

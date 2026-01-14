@@ -4,6 +4,7 @@ from typing import List, Dict, Tuple
 
 # Third party import
 from openai import OpenAI
+import google.generativeai as genai
 import requests
 
 from rest_framework import status
@@ -58,8 +59,8 @@ class AnthropicProvider(LLMProvider):
 
 class GeminiProvider(LLMProvider):
     name = "Gemini"
-    models = ["gemini-pro", "gemini-1.5-pro-latest", "gemini-pro-vision"]
-    default_model = "gemini-pro"
+    models = ["gemini-pro", "gemini-1.5-pro-latest", "gemini-1.5-flash-latest", "gemini-pro-vision"]
+    default_model = "gemini-1.5-flash-latest"
 
 
 SUPPORTED_PROVIDERS = {
@@ -119,23 +120,37 @@ def get_llm_config() -> Tuple[str | None, str | None, str | None]:
 def get_llm_response(task, prompt, api_key: str, model: str, provider: str) -> Tuple[str | None, str | None]:
     """Helper to get LLM completion response"""
     final_text = task + "\n" + prompt
+    
     try:
-        # For Gemini, prepend provider name to model
         if provider.lower() == "gemini":
-            model = f"gemini/{model}"
-
-        client = OpenAI(api_key=api_key)
-        chat_completion = client.chat.completions.create(
-            model=model, messages=[{"role": "user", "content": final_text}]
-        )
-        text = chat_completion.choices[0].message.content
-        return text, None
+            # Use Google Generative AI SDK for Gemini
+            genai.configure(api_key=api_key)
+            gemini_model = genai.GenerativeModel(model)
+            response = gemini_model.generate_content(final_text)
+            text = response.text
+            return text, None
+        elif provider.lower() == "anthropic":
+            # Anthropic uses OpenAI-compatible API format
+            client = OpenAI(api_key=api_key, base_url="https://api.anthropic.com/v1")
+            chat_completion = client.chat.completions.create(
+                model=model, messages=[{"role": "user", "content": final_text}]
+            )
+            text = chat_completion.choices[0].message.content
+            return text, None
+        else:
+            # OpenAI (default)
+            client = OpenAI(api_key=api_key)
+            chat_completion = client.chat.completions.create(
+                model=model, messages=[{"role": "user", "content": final_text}]
+            )
+            text = chat_completion.choices[0].message.content
+            return text, None
     except Exception as e:
         log_exception(e)
         error_type = e.__class__.__name__
-        if error_type == "AuthenticationError":
+        if error_type in ["AuthenticationError", "InvalidApiKey", "PermissionDenied"]:
             return None, f"Invalid API key for {provider}"
-        elif error_type == "RateLimitError":
+        elif error_type in ["RateLimitError", "ResourceExhausted"]:
             return None, f"Rate limit exceeded for {provider}"
         else:
             return None, f"Error occurred while generating response from {provider}"

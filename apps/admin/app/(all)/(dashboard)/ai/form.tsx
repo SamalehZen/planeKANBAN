@@ -1,8 +1,9 @@
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { Lightbulb } from "lucide-react";
 import { Button } from "@plane/propel/button";
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
-import type { IFormattedInstanceConfiguration, TInstanceAIConfigurationKeys } from "@plane/types";
+import type { IFormattedInstanceConfiguration, TInstanceAIConfigurationKeys, TLLMProvider } from "@plane/types";
+import { LLM_PROVIDERS } from "@plane/types";
 // components
 import type { TControllerInputFormField } from "@/components/common/controller-input";
 import { ControllerInput } from "@/components/common/controller-input";
@@ -26,21 +27,69 @@ export function InstanceAIForm(props: IInstanceAIForm) {
     formState: { errors, isSubmitting },
   } = useForm<AIFormValues>({
     defaultValues: {
+      LLM_PROVIDER: config["LLM_PROVIDER"] || "openai",
       LLM_API_KEY: config["LLM_API_KEY"],
       LLM_MODEL: config["LLM_MODEL"],
     },
   });
 
+  // Watch provider to update model options
+  const selectedProvider = useWatch({
+    control,
+    name: "LLM_PROVIDER",
+    defaultValue: config["LLM_PROVIDER"] || "openai",
+  }) as TLLMProvider;
+
+  const providerConfig = LLM_PROVIDERS[selectedProvider];
+
+  const getProviderDocLink = (provider: TLLMProvider) => {
+    switch (provider) {
+      case "openai":
+        return "https://platform.openai.com/api-keys";
+      case "gemini":
+        return "https://aistudio.google.com/app/apikey";
+      case "anthropic":
+        return "https://console.anthropic.com/settings/keys";
+      default:
+        return "#";
+    }
+  };
+
+  const getProviderModelLink = (provider: TLLMProvider) => {
+    switch (provider) {
+      case "openai":
+        return "https://platform.openai.com/docs/models/overview";
+      case "gemini":
+        return "https://ai.google.dev/gemini-api/docs/models/gemini";
+      case "anthropic":
+        return "https://docs.anthropic.com/en/docs/about-claude/models";
+      default:
+        return "#";
+    }
+  };
+
   const aiFormFields: TControllerInputFormField[] = [
     {
+      key: "LLM_PROVIDER",
+      type: "select",
+      label: "AI Provider",
+      description: "Choose your preferred AI model provider",
+      options: Object.entries(LLM_PROVIDERS).map(([key, value]) => ({
+        value: key,
+        label: value.name,
+      })),
+      error: Boolean(errors.LLM_PROVIDER),
+      required: true,
+    },
+    {
       key: "LLM_MODEL",
-      type: "text",
-      label: "LLM Model",
+      type: "select",
+      label: "Model",
       description: (
         <>
-          Choose an OpenAI engine.{" "}
+          Choose a {providerConfig.name} model.{" "}
           <a
-            href="https://platform.openai.com/docs/models/overview"
+            href={getProviderModelLink(selectedProvider)}
             target="_blank"
             className="text-accent-primary hover:underline"
             rel="noreferrer"
@@ -49,19 +98,23 @@ export function InstanceAIForm(props: IInstanceAIForm) {
           </a>
         </>
       ),
-      placeholder: "gpt-4o-mini",
+      options: providerConfig.models.map((model) => ({
+        value: model,
+        label: model,
+      })),
+      placeholder: providerConfig.defaultModel,
       error: Boolean(errors.LLM_MODEL),
       required: false,
     },
     {
       key: "LLM_API_KEY",
       type: "password",
-      label: "API key",
+      label: "API Key",
       description: (
         <>
-          You will find your API key{" "}
+          Get your {providerConfig.name} API key{" "}
           <a
-            href="https://platform.openai.com/api-keys"
+            href={getProviderDocLink(selectedProvider)}
             target="_blank"
             className="text-accent-primary hover:underline"
             rel="noreferrer"
@@ -70,7 +123,7 @@ export function InstanceAIForm(props: IInstanceAIForm) {
           </a>
         </>
       ),
-      placeholder: "sk-asddassdfasdefqsdfasd23das3dasdcasd",
+      placeholder: "Enter your API key",
       error: Boolean(errors.LLM_API_KEY),
       required: false,
     },
@@ -94,8 +147,11 @@ export function InstanceAIForm(props: IInstanceAIForm) {
     <div className="space-y-8">
       <div className="space-y-3">
         <div>
-          <div className="pb-1 text-18 font-medium text-primary">OpenAI</div>
-          <div className="text-13 font-regular text-tertiary">If you use ChatGPT, this is for you.</div>
+          <div className="pb-1 text-18 font-medium text-primary">AI Configuration</div>
+          <div className="text-13 font-regular text-tertiary">
+            Configure your AI provider (OpenAI, Google Gemini, or Anthropic Claude) to enable AI features across all
+            workspaces.
+          </div>
         </div>
         <div className="grid-col grid w-full grid-cols-1 items-center justify-between gap-x-12 gap-y-8 lg:grid-cols-3">
           {aiFormFields.map((field) => (
@@ -109,6 +165,7 @@ export function InstanceAIForm(props: IInstanceAIForm) {
               placeholder={field.placeholder}
               error={field.error}
               required={field.required}
+              options={field.options}
             />
           ))}
         </div>
@@ -122,10 +179,7 @@ export function InstanceAIForm(props: IInstanceAIForm) {
         <div className="relative inline-flex items-center gap-2 rounded-sm border border-accent-strong/20 bg-accent-primary/10 px-4 py-2 text-11 text-accent-secondary">
           <Lightbulb height="14" width="14" />
           <div>
-            If you have a preferred AI models vendor, please get in{" "}
-            <a className="underline font-medium" href="https://plane.so/contact">
-              touch with us.
-            </a>
+            Currently supporting OpenAI (ChatGPT), Google Gemini, and Anthropic Claude. More providers coming soon!
           </div>
         </div>
       </div>
