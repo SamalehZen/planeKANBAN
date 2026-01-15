@@ -158,8 +158,16 @@ export const useSpeechToText = (options: UseSpeechToTextOptions): UseSpeechToTex
           }
 
           if (data.type === "Turn" && data.transcript) {
-            if (data.end_of_turn) {
-              console.log("[Speech] Final transcript:", data.transcript);
+            const isFinal = data.end_of_turn && data.turn_is_formatted;
+            console.log("[Speech] Turn details:", { 
+              transcript: data.transcript, 
+              end_of_turn: data.end_of_turn, 
+              turn_is_formatted: data.turn_is_formatted,
+              isFinal 
+            });
+            
+            if (isFinal) {
+              console.log("[Speech] Final formatted transcript:", data.transcript);
               setInterimText("");
               onTranscript(data.transcript, true);
             } else {

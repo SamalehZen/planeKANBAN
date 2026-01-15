@@ -159,9 +159,13 @@ export const PageEditorBody = observer(function PageEditorBody(props: Props) {
 
   const handleSpeechTranscript = useCallback(
     (text: string, isFinal: boolean) => {
-      if (!editorRef?.current) return;
+      console.log("[Speech] handleSpeechTranscript called:", { text, isFinal, hasEditorRef: !!editorRef?.current, hasForwardRef: !!editorForwardRef?.current });
       
-      const editor = editorRef.current;
+      const editor = editorForwardRef?.current || editorRef?.current;
+      if (!editor) {
+        console.error("[Speech] No editor ref available");
+        return;
+      }
       
       if (currentNodeInfo) {
         if (isFinal) {
@@ -184,16 +188,22 @@ export const PageEditorBody = observer(function PageEditorBody(props: Props) {
               });
             }
           } catch (e) {
-            console.error("Error updating text:", e);
+            console.error("[Speech] Error updating text:", e);
           }
         }
       } else {
-        if (isFinal) {
-          editor.insertTextAtCursor(text + " ");
+        if (isFinal && text) {
+          console.log("[Speech] Inserting final text at cursor:", text);
+          try {
+            editor.insertTextAtCursor(text + " ");
+            console.log("[Speech] Text inserted successfully");
+          } catch (e) {
+            console.error("[Speech] Error inserting text:", e);
+          }
         }
       }
     },
-    [editorRef, currentNodeInfo]
+    [editorRef, editorForwardRef, currentNodeInfo]
   );
 
   const {
