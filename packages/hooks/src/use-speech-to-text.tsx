@@ -54,7 +54,7 @@ export const useSpeechToText = (options: UseSpeechToTextOptions): UseSpeechToTex
 
     if (websocketRef.current) {
       if (websocketRef.current.readyState === WebSocket.OPEN) {
-        websocketRef.current.send(JSON.stringify({ terminate_session: true }));
+        websocketRef.current.send(JSON.stringify({ type: "Terminate" }));
       }
       websocketRef.current.close();
       websocketRef.current = null;
@@ -112,7 +112,7 @@ export const useSpeechToText = (options: UseSpeechToTextOptions): UseSpeechToTex
       console.log("[Speech] Microphone access granted");
 
       console.log("[Speech] Connecting to AssemblyAI WebSocket...");
-      const ws = new WebSocket(`wss://api.assemblyai.com/v2/realtime/ws?sample_rate=16000&token=${tokenResponse.token}`);
+      const ws = new WebSocket(`wss://streaming.assemblyai.com/v3/ws?sample_rate=16000&format_turns=true&token=${tokenResponse.token}`);
       websocketRef.current = ws;
 
       ws.onopen = () => {
@@ -132,8 +132,7 @@ export const useSpeechToText = (options: UseSpeechToTextOptions): UseSpeechToTex
           if (ws.readyState === WebSocket.OPEN) {
             const inputData = e.inputBuffer.getChannelData(0);
             const pcmData = floatTo16BitPCM(inputData);
-            const base64Audio = btoa(String.fromCharCode(...new Uint8Array(pcmData)));
-            ws.send(JSON.stringify({ audio_data: base64Audio }));
+            ws.send(pcmData);
             audioChunkCount++;
             if (audioChunkCount % 50 === 0) {
               console.log(`[Speech] Sent ${audioChunkCount} audio chunks`);
@@ -149,7 +148,7 @@ export const useSpeechToText = (options: UseSpeechToTextOptions): UseSpeechToTex
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          console.log("[Speech] Received message:", data.message_type, data.text ? `"${data.text}"` : "");
+          console.log("[Speech] Received message:", data.type, data.transcript ? `"${data.transcript}"` : "");
 
           if (data.error) {
             console.error("[Speech] Error from AssemblyAI:", data.error);
@@ -158,13 +157,19 @@ export const useSpeechToText = (options: UseSpeechToTextOptions): UseSpeechToTex
             return;
           }
 
-          if (data.message_type === "PartialTranscript" && data.text) {
-            setInterimText(data.text);
-            onTranscript(data.text, false);
-          } else if (data.message_type === "FinalTranscript" && data.text) {
-            console.log("[Speech] Final transcript:", data.text);
-            setInterimText("");
-            onTranscript(data.text, true);
+          if (data.type === "Turn" && data.transcript) {
+            if (data.end_of_turn) {
+              console.log("[Speech] Final transcript:", data.transcript);
+              setInterimText("");
+              onTranscript(data.transcript, true);
+            } else {
+              setInterimText(data.transcript);
+              onTranscript(data.transcript, false);
+            }
+          } else if (data.type === "Begin") {
+            console.log("[Speech] Session started");
+          } else if (data.type === "Termination") {
+            console.log("[Speech] Session terminated:", data.reason);
           }
         } catch (parseError) {
           console.error("[Speech] Error parsing message:", parseError);

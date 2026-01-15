@@ -30,10 +30,10 @@ class AssemblyAITokenEndpoint(BaseAPIView):
             )
 
         try:
-            response = requests.post(
-                "https://api.assemblyai.com/v2/realtime/token",
+            response = requests.get(
+                "https://streaming.assemblyai.com/v3/token",
                 headers={"authorization": api_key},
-                json={"expires_in": 3600},
+                params={"expires_in_seconds": 600},
             )
 
             if response.status_code != 200:
