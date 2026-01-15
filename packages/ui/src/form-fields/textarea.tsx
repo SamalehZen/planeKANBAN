@@ -1,14 +1,17 @@
-import React, { useRef } from "react";
-// helpers
+import React, { useRef, useCallback } from "react";
+import type { AI_EDITOR_TASKS } from "@plane/constants";
+import { useAITextSelection } from "@plane/hooks";
 import { useAutoResizeTextArea } from "../hooks/use-auto-resize-textarea";
 import { cn } from "../utils";
-// hooks
+import { FloatingAIMenu } from "../ai-menu/floating-ai-menu";
 
 export interface TextAreaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
   mode?: "primary" | "transparent" | "true-transparent";
   textAreaSize?: "xs" | "sm" | "md";
   hasError?: boolean;
   className?: string;
+  aiEnabled?: boolean;
+  onAIAction?: (task: AI_EDITOR_TASKS, text: string) => Promise<string | null>;
 }
 
 const TextArea = React.forwardRef(function TextArea(
@@ -23,36 +26,78 @@ const TextArea = React.forwardRef(function TextArea(
     textAreaSize = "sm",
     hasError = false,
     className = "",
+    aiEnabled = false,
+    onAIAction,
     ...rest
   } = props;
-  // refs
-  const textAreaRef = useRef<any>(ref);
-  // auto re-size
+  const textAreaRef = useRef<HTMLTextAreaElement | null>(null);
   useAutoResizeTextArea(textAreaRef, value);
 
+  const setRefs = useCallback(
+    (node: HTMLTextAreaElement | null) => {
+      textAreaRef.current = node;
+      if (typeof ref === "function") {
+        ref(node);
+      } else if (ref) {
+        ref.current = node;
+      }
+    },
+    [ref]
+  );
+
+  const {
+    isMenuVisible,
+    menuPosition,
+    selectedText,
+    menuRef,
+    hideMenu,
+    replaceSelection,
+  } = useAITextSelection(textAreaRef, { enabled: aiEnabled && !!onAIAction });
+
+  const handleAIAction = useCallback(
+    async (task: AI_EDITOR_TASKS, text: string) => {
+      if (!onAIAction) return null;
+      return onAIAction(task, text);
+    },
+    [onAIAction]
+  );
+
   return (
-    <textarea
-      id={id}
-      name={name}
-      ref={textAreaRef}
-      value={value}
-      className={cn(
-        "no-scrollbar w-full bg-layer-2 placeholder-(--text-color-placeholder) outline-none",
-        {
-          "rounded-md border-[0.5px] border-subtle-1": mode === "primary",
-          "focus:ring-theme rounded-sm border-none bg-transparent ring-0 transition-all focus:ring-1":
-            mode === "transparent",
-          "rounded-sm border-none bg-transparent ring-0": mode === "true-transparent",
-          "px-1.5 py-1": textAreaSize === "xs",
-          "px-3 py-2": textAreaSize === "sm",
-          "p-3": textAreaSize === "md",
-          "border-red-500": hasError,
-          "bg-red-100": hasError && mode === "primary",
-        },
-        className
+    <>
+      <textarea
+        id={id}
+        name={name}
+        ref={setRefs}
+        value={value}
+        className={cn(
+          "no-scrollbar w-full bg-layer-2 placeholder-(--text-color-placeholder) outline-none",
+          {
+            "rounded-md border-[0.5px] border-subtle-1": mode === "primary",
+            "focus:ring-theme rounded-sm border-none bg-transparent ring-0 transition-all focus:ring-1":
+              mode === "transparent",
+            "rounded-sm border-none bg-transparent ring-0": mode === "true-transparent",
+            "px-1.5 py-1": textAreaSize === "xs",
+            "px-3 py-2": textAreaSize === "sm",
+            "p-3": textAreaSize === "md",
+            "border-red-500": hasError,
+            "bg-red-100": hasError && mode === "primary",
+          },
+          className
+        )}
+        {...rest}
+      />
+      {aiEnabled && onAIAction && (
+        <FloatingAIMenu
+          isVisible={isMenuVisible}
+          position={menuPosition}
+          selectedText={selectedText}
+          onClose={hideMenu}
+          onAction={handleAIAction}
+          onReplace={replaceSelection}
+          menuRef={menuRef}
+        />
       )}
-      {...rest}
-    />
+    </>
   );
 });
 
