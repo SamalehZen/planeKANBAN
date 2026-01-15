@@ -179,9 +179,12 @@ export type IEditorProps = {
   workItemIdentifier?: string | null;
 };
 
-export type ILiteTextEditorProps = IEditorProps;
+export type ILiteTextEditorProps = IEditorProps & {
+  aiHandler?: TAIHandler;
+};
 
 export type IRichTextEditorProps = IEditorProps & {
+  aiHandler?: TAIHandler;
   dragDropEnabled?: boolean;
 };
 
