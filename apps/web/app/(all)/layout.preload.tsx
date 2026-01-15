@@ -1,26 +1,22 @@
-// TODO: Check if we need this
-// https://nextjs.org/docs/app/api-reference/functions/generate-metadata#link-relpreload
-// export const usePreloadResources = () => {
-//   useEffect(() => {
-//     const preloadItem = (url: string) => {
-//       ReactDOM.preload(url, { as: "fetch", crossOrigin: "use-credentials" });
-//     };
+"use client";
 
-//     const urls = [
-//       `${process.env.VITE_API_BASE_URL}/api/instances/`,
-//       `${process.env.VITE_API_BASE_URL}/api/users/me/`,
-//       `${process.env.VITE_API_BASE_URL}/api/users/me/profile/`,
-//       `${process.env.VITE_API_BASE_URL}/api/users/me/settings/`,
-//       `${process.env.VITE_API_BASE_URL}/api/users/me/workspaces/?v=${Date.now()}`,
-//     ];
+import { useEffect } from "react";
+import ReactDOM from "react-dom";
 
-//     urls.forEach((url) => preloadItem(url));
-//   }, []);
-// };
+const PRELOAD_URLS = [
+  "/api/v1/instances/",
+  "/api/v1/users/me/",
+  "/api/v1/users/me/profile/",
+  "/api/v1/users/me/settings/",
+  "/api/v1/users/me/workspaces/",
+];
 
 export function PreloadResources() {
-  return (
-    // usePreloadResources();
-    null
-  );
+  useEffect(() => {
+    PRELOAD_URLS.forEach((url) => {
+      ReactDOM.preload(url, { as: "fetch", crossOrigin: "use-credentials" });
+    });
+  }, []);
+
+  return null;
 }

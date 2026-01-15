@@ -158,11 +158,10 @@ export class ProfileStore implements IUserProfileStore {
         last_workspace_id: firstWorkspace?.id,
       };
 
-      // update user onboarding steps
-      await this.userService.updateCurrentUserProfile(dataToUpdate);
-
-      // update user onboarding status
-      await this.userService.updateUserOnBoard();
+      await Promise.all([
+        this.userService.updateCurrentUserProfile(dataToUpdate),
+        this.userService.updateUserOnBoard(),
+      ]);
 
       // Wait for user settings to be refreshed with cache-busting before updating onboarding status
       await Promise.all([
