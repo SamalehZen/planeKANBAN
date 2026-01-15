@@ -6,10 +6,14 @@ import { CORE_EXTENSIONS } from "@/constants/extension";
 // plugins
 import { AIHandlePlugin } from "@/plugins/ai-handle";
 import { DragHandlePlugin, nodeDOMAtCoords } from "@/plugins/drag-handle";
+import type { MicrophoneHandleCallbacks } from "@/plugins/microphone-handle";
+import { MicrophoneHandlePlugin } from "@/plugins/microphone-handle";
 
 type Props = {
   aiEnabled: boolean;
   dragDropEnabled: boolean;
+  speechEnabled?: boolean;
+  speechCallbacks?: MicrophoneHandleCallbacks;
 };
 
 export type SideMenuPluginProps = {
@@ -17,7 +21,9 @@ export type SideMenuPluginProps = {
   handlesConfig: {
     ai: boolean;
     dragDrop: boolean;
+    speech: boolean;
   };
+  speechCallbacks?: MicrophoneHandleCallbacks;
   scrollThreshold: {
     up: number;
     down: number;
@@ -32,7 +38,7 @@ export type SideMenuHandleOptions = {
 };
 
 export const SideMenuExtension = (props: Props) => {
-  const { aiEnabled, dragDropEnabled } = props;
+  const { aiEnabled, dragDropEnabled, speechEnabled = false, speechCallbacks } = props;
 
   return Extension.create({
     name: CORE_EXTENSIONS.SIDE_MENU,
@@ -43,7 +49,9 @@ export const SideMenuExtension = (props: Props) => {
           handlesConfig: {
             ai: aiEnabled,
             dragDrop: dragDropEnabled,
+            speech: speechEnabled,
           },
+          speechCallbacks,
           scrollThreshold: { up: 200, down: 150 },
         }),
       ];
@@ -62,7 +70,7 @@ const absoluteRect = (node: Element) => {
 };
 
 const SideMenu = (options: SideMenuPluginProps) => {
-  const { handlesConfig } = options;
+  const { handlesConfig, speechCallbacks } = options;
   const editorSideMenu: HTMLDivElement | null = document.createElement("div");
   editorSideMenu.id = "editor-side-menu";
   // side menu view actions
@@ -73,6 +81,7 @@ const SideMenu = (options: SideMenuPluginProps) => {
   // side menu elements
   const { view: dragHandleView, domEvents: dragHandleDOMEvents } = DragHandlePlugin(options);
   const { view: aiHandleView, domEvents: aiHandleDOMEvents } = AIHandlePlugin(options);
+  const { view: micHandleView, domEvents: micHandleDOMEvents } = MicrophoneHandlePlugin(options, speechCallbacks);
 
   return new Plugin({
     key: new PluginKey("sideMenu"),
@@ -82,6 +91,10 @@ const SideMenu = (options: SideMenuPluginProps) => {
       // side menu elements' initialization
       if (handlesConfig.ai && !editorSideMenu.querySelector("#ai-handle")) {
         aiHandleView(view, editorSideMenu);
+      }
+
+      if (handlesConfig.speech && speechCallbacks && !editorSideMenu.querySelector("#mic-handle")) {
+        micHandleView(view, editorSideMenu);
       }
 
       if (handlesConfig.dragDrop && !editorSideMenu.querySelector("#drag-handle")) {
@@ -116,9 +129,14 @@ const SideMenu = (options: SideMenuPluginProps) => {
           rect.top += (lineHeight - 20) / 2;
           rect.top += paddingTop;
 
+          let leftOffset = 0;
           if (handlesConfig.ai) {
-            rect.left -= 20;
+            leftOffset += 20;
           }
+          if (handlesConfig.speech && speechCallbacks) {
+            leftOffset += 20;
+          }
+          rect.left -= leftOffset;
 
           if (node.parentElement?.parentElement?.matches("td") || node.parentElement?.parentElement?.matches("th")) {
             if (node.matches("ul:not([data-type=taskList]) li, ol li")) {
@@ -148,6 +166,9 @@ const SideMenu = (options: SideMenuPluginProps) => {
           }
           if (handlesConfig.ai) {
             aiHandleDOMEvents?.mousemove?.();
+          }
+          if (handlesConfig.speech) {
+            micHandleDOMEvents?.mousemove?.();
           }
         },
         // keydown: () => hideSideMenu(),

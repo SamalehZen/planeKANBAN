@@ -169,20 +169,33 @@ export const PageEditorBody = observer(function PageEditorBody(props: Props) {
       if (!workspaceSlug) return null;
       try {
         const aiService = new AIService();
-        const taskPayload = {
-          task: payload.task,
-          text_input: payload.text,
-          casual_score: payload.casual_score,
-          formal_score: payload.formal_score,
-        };
-        if (payload.task === AI_EDITOR_TASKS.ASK_ANYTHING && payload.prompt) {
-          const result = await aiService.createGptTask(workspaceSlug, {
-            prompt: `${payload.prompt}\n\nTexte: ${payload.text}`,
-            task: "custom",
-          });
-          return result?.response || null;
+        let prompt = "";
+        switch (payload.task) {
+          case AI_EDITOR_TASKS.PARAPHRASE:
+            prompt = `Paraphrase le texte suivant en gardant le même sens mais avec des mots différents:\n\n${payload.text}`;
+            break;
+          case AI_EDITOR_TASKS.SIMPLIFY:
+            prompt = `Simplifie le texte suivant pour le rendre plus facile à comprendre:\n\n${payload.text}`;
+            break;
+          case AI_EDITOR_TASKS.EXPAND:
+            prompt = `Développe et enrichis le texte suivant avec plus de détails:\n\n${payload.text}`;
+            break;
+          case AI_EDITOR_TASKS.SUMMARIZE:
+            prompt = `Résume le texte suivant de manière concise:\n\n${payload.text}`;
+            break;
+          case AI_EDITOR_TASKS.GENERATE_TITLE:
+            prompt = `Génère un titre court et accrocheur pour le texte suivant:\n\n${payload.text}`;
+            break;
+          case AI_EDITOR_TASKS.ASK_ANYTHING:
+            prompt = payload.prompt ? `${payload.prompt}\n\nTexte: ${payload.text}` : payload.text;
+            break;
+          default:
+            prompt = payload.text;
         }
-        const result = await aiService.performEditorTask(workspaceSlug, taskPayload);
+        const result = await aiService.createGptTask(workspaceSlug, {
+          prompt,
+          task: payload.task,
+        });
         return result?.response || null;
       } catch (error) {
         console.error("AI action failed:", error);
