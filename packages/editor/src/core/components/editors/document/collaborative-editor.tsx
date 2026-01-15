@@ -109,6 +109,7 @@ function CollaborativeDocumentEditorInner(props: ICollaborativeDocumentEditorPro
       >
         <PageRenderer
           aiHandler={aiHandler}
+          aiSelectionHandler={aiHandler?.onSelectionAction}
           bubbleMenuEnabled={bubbleMenuEnabled}
           displayConfig={displayConfig}
           documentLoaderClassName={documentLoaderClassName}

@@ -7,12 +7,14 @@ import type {
   CollaborationState,
   EditorRefApi,
   EditorTitleRefApi,
+  TAIActionPayload,
   TAIMenuProps,
   TDisplayConfig,
   TFileHandler,
   TRealtimeConfig,
   TServerHandler,
 } from "@plane/editor";
+import { AI_EDITOR_TASKS } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
 import type { TSearchEntityRequestPayload, TSearchResponse, TWebhookConnectionQueryParams } from "@plane/types";
 import { ERowVariant, Row } from "@plane/ui";
@@ -30,6 +32,7 @@ import { useParseEditorContent } from "@/hooks/use-parse-editor-content";
 import type { TCustomEventHandlers } from "@/hooks/use-realtime-page-events";
 import { useRealtimePageEvents } from "@/hooks/use-realtime-page-events";
 import { EditorAIMenu } from "@/plane-web/components/pages";
+import { AIService } from "@/services/ai.service";
 import type { TExtendedEditorExtensionsConfig } from "@/plane-web/hooks/pages";
 import type { EPageStoreType } from "@/plane-web/hooks/store";
 import { useEditorFlagging } from "@/plane-web/hooks/use-editor-flagging";
@@ -161,6 +164,34 @@ export const PageEditorBody = observer(function PageEditorBody(props: Props) {
     [editorRef, workspaceId, workspaceSlug]
   );
 
+  const handleAISelectionAction = useCallback(
+    async (payload: TAIActionPayload): Promise<string | null> => {
+      if (!workspaceSlug) return null;
+      try {
+        const aiService = new AIService();
+        const taskPayload = {
+          task: payload.task,
+          text_input: payload.text,
+          casual_score: payload.casual_score,
+          formal_score: payload.formal_score,
+        };
+        if (payload.task === AI_EDITOR_TASKS.ASK_ANYTHING && payload.prompt) {
+          const result = await aiService.createGptTask(workspaceSlug, {
+            prompt: `${payload.prompt}\n\nTexte: ${payload.text}`,
+            task: "custom",
+          });
+          return result?.response || null;
+        }
+        const result = await aiService.performEditorTask(workspaceSlug, taskPayload);
+        return result?.response || null;
+      } catch (error) {
+        console.error("AI action failed:", error);
+        return null;
+      }
+    },
+    [workspaceSlug]
+  );
+
   const serverHandler: TServerHandler = useMemo(
     () => ({
       onStateChange: (state) => {
@@ -287,6 +318,7 @@ export const PageEditorBody = observer(function PageEditorBody(props: Props) {
             flaggedExtensions={documentEditorExtensions.flagged}
             aiHandler={{
               menu: getAIMenu,
+              onSelectionAction: handleAISelectionAction,
             }}
             onAssetChange={updateAssetsList}
             extendedEditorProps={extendedEditorProps}
