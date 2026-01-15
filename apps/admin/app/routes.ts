@@ -14,6 +14,7 @@ export default [
     route("authentication/google", "./(all)/(dashboard)/authentication/google/page.tsx"),
     route("authentication/gitea", "./(all)/(dashboard)/authentication/gitea/page.tsx"),
     route("ai", "./(all)/(dashboard)/ai/page.tsx"),
+    route("speech", "./(all)/(dashboard)/speech/page.tsx"),
     route("image", "./(all)/(dashboard)/image/page.tsx"),
   ]),
   // Catch-all route for 404 handling - must be last

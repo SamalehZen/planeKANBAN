@@ -3,6 +3,7 @@ import type {
   TInstanceAIConfigurationKeys,
   TInstanceEmailConfigurationKeys,
   TInstanceImageConfigurationKeys,
+  TInstanceSpeechConfigurationKeys,
   TInstanceAuthenticationKeys,
   TInstanceWorkspaceConfigurationKeys,
   TCoreLoginMediums,
@@ -83,6 +84,7 @@ export type TInstanceConfigurationKeys =
   | TInstanceAIConfigurationKeys
   | TInstanceEmailConfigurationKeys
   | TInstanceImageConfigurationKeys
+  | TInstanceSpeechConfigurationKeys
   | TInstanceAuthenticationKeys
   | TInstanceIntercomConfigurationKeys
   | TInstanceWorkspaceConfigurationKeys;
