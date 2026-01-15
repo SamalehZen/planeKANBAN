@@ -1,9 +1,8 @@
 import React, { useRef, useCallback } from "react";
-import type { AI_EDITOR_TASKS } from "@plane/constants";
 import { useAITextSelection } from "@plane/hooks";
 import { useAutoResizeTextArea } from "../hooks/use-auto-resize-textarea";
 import { cn } from "../utils";
-import { FloatingAIMenu } from "../ai-menu/floating-ai-menu";
+import { FloatingAIMenu, type TAIActionPayload } from "../ai-menu/floating-ai-menu";
 
 export interface TextAreaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
   mode?: "primary" | "transparent" | "true-transparent";
@@ -11,7 +10,7 @@ export interface TextAreaProps extends React.TextareaHTMLAttributes<HTMLTextArea
   hasError?: boolean;
   className?: string;
   aiEnabled?: boolean;
-  onAIAction?: (task: AI_EDITOR_TASKS, text: string) => Promise<string | null>;
+  onAIAction?: (payload: TAIActionPayload) => Promise<string | null>;
 }
 
 const TextArea = React.forwardRef(function TextArea(
@@ -55,9 +54,9 @@ const TextArea = React.forwardRef(function TextArea(
   } = useAITextSelection(textAreaRef, { enabled: aiEnabled && !!onAIAction });
 
   const handleAIAction = useCallback(
-    async (task: AI_EDITOR_TASKS, text: string) => {
+    async (payload: TAIActionPayload) => {
       if (!onAIAction) return null;
-      return onAIAction(task, text);
+      return onAIAction(payload);
     },
     [onAIAction]
   );

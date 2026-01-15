@@ -1,9 +1,8 @@
 import * as React from "react";
 import { useRef, useCallback } from "react";
-import type { AI_EDITOR_TASKS } from "@plane/constants";
 import { useAITextSelection } from "@plane/hooks";
 import { cn } from "../utils";
-import { FloatingAIMenu } from "../ai-menu/floating-ai-menu";
+import { FloatingAIMenu, type TAIActionPayload } from "../ai-menu/floating-ai-menu";
 
 export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   mode?: "primary" | "transparent" | "true-transparent";
@@ -12,7 +11,7 @@ export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> 
   className?: string;
   autoComplete?: "on" | "off";
   aiEnabled?: boolean;
-  onAIAction?: (task: AI_EDITOR_TASKS, text: string) => Promise<string | null>;
+  onAIAction?: (payload: TAIActionPayload) => Promise<string | null>;
 }
 
 const Input = React.forwardRef(function Input(props: InputProps, ref: React.ForwardedRef<HTMLInputElement>) {
@@ -54,9 +53,9 @@ const Input = React.forwardRef(function Input(props: InputProps, ref: React.Forw
   } = useAITextSelection(inputRef, { enabled: aiEnabled && !!onAIAction });
 
   const handleAIAction = useCallback(
-    async (task: AI_EDITOR_TASKS, text: string) => {
+    async (payload: TAIActionPayload) => {
       if (!onAIAction) return null;
-      return onAIAction(task, text);
+      return onAIAction(payload);
     },
     [onAIAction]
   );

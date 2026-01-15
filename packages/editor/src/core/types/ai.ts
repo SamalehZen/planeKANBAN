@@ -5,10 +5,15 @@ export type TAIMenuProps = {
   onClose: () => void;
 };
 
-export type TAISelectionHandler = (
-  task: AI_EDITOR_TASKS,
-  selectedText: string
-) => Promise<string | null>;
+export type TAIActionPayload = {
+  task: AI_EDITOR_TASKS;
+  text: string;
+  casual_score?: number;
+  formal_score?: number;
+  prompt?: string;
+};
+
+export type TAISelectionHandler = (payload: TAIActionPayload) => Promise<string | null>;
 
 export type TAIHandler = {
   menu?: (props: TAIMenuProps) => React.ReactNode;
