@@ -31,3 +31,4 @@ export * from "./tooltip";
 export * from "./typography";
 export * from "./utils";
 export * from "./oauth";
+export * from "./speech";
