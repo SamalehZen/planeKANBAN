@@ -29,6 +29,8 @@ export const AdminHeader = observer(function AdminHeader() {
         return "General";
       case "ai":
         return "Artificial Intelligence";
+      case "speech":
+        return "Speech-to-Text";
       case "email":
         return "Email";
       case "authentication":

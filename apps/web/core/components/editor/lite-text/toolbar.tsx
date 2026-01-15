@@ -1,9 +1,11 @@
 import React, { useEffect, useState, useCallback } from "react";
 import type { LucideIcon } from "lucide-react";
-import { Globe2, Lock } from "lucide-react";
+import { Globe2, Lock, Loader2, Mic, MicOff } from "lucide-react";
 import { EIssueCommentAccessSpecifier } from "@plane/constants";
 // editor
 import type { EditorRefApi } from "@plane/editor";
+// hooks
+import { useSpeechToText } from "@plane/hooks";
 // i18n
 import { useTranslation } from "@plane/i18n";
 // ui
@@ -26,6 +28,8 @@ type Props = {
   showSubmitButton: boolean;
   editorRef: EditorRefApi | null;
   submitButtonText?: string;
+  workspaceSlug?: string;
+  speechEnabled?: boolean;
 };
 
 type TCommentAccessType = {
@@ -62,9 +66,40 @@ export function IssueCommentToolbar(props: Props) {
     showSubmitButton,
     editorRef,
     submitButtonText = "common.comment",
+    workspaceSlug,
+    speechEnabled = true,
   } = props;
   // State to manage active states of toolbar items
   const [activeStates, setActiveStates] = useState<Record<string, boolean>>({});
+
+  const handleSpeechTranscript = useCallback(
+    (text: string, isFinal: boolean) => {
+      if (isFinal && editorRef) {
+        editorRef.insertTextAtCursor(text + " ");
+      }
+    },
+    [editorRef]
+  );
+
+  const {
+    isRecording,
+    isConnecting,
+    startRecording,
+    stopRecording,
+  } = useSpeechToText({
+    workspaceSlug: workspaceSlug || "",
+    onTranscript: handleSpeechTranscript,
+  });
+
+  const handleMicClick = useCallback(() => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
+  }, [isRecording, startRecording, stopRecording]);
+
+  const isSpeechAvailable = speechEnabled && workspaceSlug;
 
   // Function to update active states
   const updateActiveStates = useCallback(() => {
@@ -167,8 +202,41 @@ export function IssueCommentToolbar(props: Props) {
             </div>
           ))}
         </div>
-        {showSubmitButton && (
-          <div className="sticky right-1">
+        <div className="flex items-center gap-1.5 sticky right-1">
+          {isSpeechAvailable && (
+            <Tooltip
+              tooltipContent={
+                isConnecting
+                  ? "Connecting..."
+                  : isRecording
+                    ? "Stop recording"
+                    : "Voice input"
+              }
+            >
+              <button
+                type="button"
+                onClick={handleMicClick}
+                disabled={isConnecting}
+                className={cn(
+                  "grid place-items-center size-7 rounded-sm transition-all",
+                  {
+                    "bg-red-500 text-white animate-pulse": isRecording,
+                    "text-placeholder hover:bg-layer-1 hover:text-secondary": !isRecording,
+                    "opacity-50 cursor-not-allowed": isConnecting,
+                  }
+                )}
+              >
+                {isConnecting ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : isRecording ? (
+                  <MicOff className="size-3.5" />
+                ) : (
+                  <Mic className="size-3.5" />
+                )}
+              </button>
+            </Tooltip>
+          )}
+          {showSubmitButton && (
             <Button
               type="submit"
               variant="primary"
@@ -179,8 +247,8 @@ export function IssueCommentToolbar(props: Props) {
             >
               {t(submitButtonText)}
             </Button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

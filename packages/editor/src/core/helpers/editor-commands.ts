@@ -192,3 +192,13 @@ export const openEmojiPicker = (editor: Editor, range?: Range) => {
   emojiStorage.forceOpen = true;
   editor.chain().focus().insertContent(":").run();
 };
+
+export const insertTextAtCursor = (editor: Editor, text: string) => {
+  if (!editor) return;
+  const { from, to } = editor.state.selection;
+  if (from !== to) {
+    editor.chain().focus().deleteRange({ from, to }).insertContent(text).run();
+  } else {
+    editor.chain().focus().insertContent(text).run();
+  }
+};

@@ -1,7 +1,7 @@
 import { observer } from "mobx-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Image, BrainCog, Cog, Lock, Mail } from "lucide-react";
+import { Image, BrainCog, Cog, Lock, Mail, Mic } from "lucide-react";
 // plane internal packages
 import { WorkspaceIcon } from "@plane/propel/icons";
 import { Tooltip } from "@plane/propel/tooltip";
@@ -39,6 +39,12 @@ const INSTANCE_ADMIN_LINKS = [
     name: "Artificial intelligence",
     description: "Configure your OpenAI creds.",
     href: `/ai/`,
+  },
+  {
+    Icon: Mic,
+    name: "Speech-to-Text",
+    description: "Configure voice transcription.",
+    href: `/speech/`,
   },
   {
     Icon: Image,

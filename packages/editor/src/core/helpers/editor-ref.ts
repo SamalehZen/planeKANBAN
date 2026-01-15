@@ -184,6 +184,15 @@ export const getEditorRefHelpers = (args: TArgs): EditorRefApi => {
         editor.chain().focus().deleteRange({ from, to }).insertContent(contentHTML).run();
       }
     },
+    insertTextAtCursor: (text) => {
+      if (!editor) return;
+      const { from, to } = editor.state.selection;
+      if (from !== to) {
+        editor.chain().focus().deleteRange({ from, to }).insertContent(text).run();
+      } else {
+        editor.chain().focus().insertContent(text).run();
+      }
+    },
     isEditorReadyToDiscard: () => editor?.storage?.utility?.uploadInProgress === false,
     isMenuItemActive: (props) => {
       const { itemKey } = props;
