@@ -154,14 +154,46 @@ export const PageEditorBody = observer(function PageEditorBody(props: Props) {
 
   // Speech-to-text integration
   const [isRecordingState, setIsRecordingState] = useState(false);
+  const [currentNodeInfo, setCurrentNodeInfo] = useState<{ from: number; to: number } | null>(null);
+  const streamingTextRef = useRef<string>("");
 
   const handleSpeechTranscript = useCallback(
     (text: string, isFinal: boolean) => {
-      if (isFinal && editorRef?.current) {
-        editorRef.current.insertTextAtCursor(text + " ");
+      if (!editorRef?.current) return;
+      
+      const editor = editorRef.current;
+      
+      if (currentNodeInfo) {
+        if (isFinal) {
+          streamingTextRef.current = "";
+        } else {
+          streamingTextRef.current = text;
+          try {
+            const view = (editor as any).editor?.view;
+            if (view) {
+              const { state, dispatch } = view;
+              const tr = state.tr.replaceWith(
+                currentNodeInfo.from,
+                currentNodeInfo.to,
+                state.schema.text(text || " ")
+              );
+              dispatch(tr);
+              setCurrentNodeInfo({
+                from: currentNodeInfo.from,
+                to: currentNodeInfo.from + (text?.length || 1),
+              });
+            }
+          } catch (e) {
+            console.error("Error updating text:", e);
+          }
+        }
+      } else {
+        if (isFinal) {
+          editor.insertTextAtCursor(text + " ");
+        }
       }
     },
-    [editorRef]
+    [editorRef, currentNodeInfo]
   );
 
   const {
@@ -179,8 +211,16 @@ export const PageEditorBody = observer(function PageEditorBody(props: Props) {
 
   const speechHandler = useMemo(
     () => ({
-      onStart: startRecording,
-      onStop: stopRecording,
+      onStart: (nodeInfo?: { from: number; to: number }) => {
+        setCurrentNodeInfo(nodeInfo || null);
+        streamingTextRef.current = "";
+        startRecording();
+      },
+      onStop: () => {
+        stopRecording();
+        setCurrentNodeInfo(null);
+        streamingTextRef.current = "";
+      },
       isRecording: () => isRecordingState,
     }),
     [startRecording, stopRecording, isRecordingState]

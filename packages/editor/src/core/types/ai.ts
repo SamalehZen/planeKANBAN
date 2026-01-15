@@ -21,7 +21,7 @@ export type TAIHandler = {
 };
 
 export type TSpeechHandler = {
-  onStart: () => void;
+  onStart: (nodeInfo?: { from: number; to: number }) => void;
   onStop: () => void;
   isRecording: () => boolean;
 };
