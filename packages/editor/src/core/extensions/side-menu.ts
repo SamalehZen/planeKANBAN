@@ -73,11 +73,41 @@ const SideMenu = (options: SideMenuPluginProps) => {
   const { handlesConfig, speechCallbacks } = options;
   const editorSideMenu: HTMLDivElement | null = document.createElement("div");
   editorSideMenu.id = "editor-side-menu";
+  let hideTimeout: ReturnType<typeof setTimeout> | null = null;
+  let isHoveringMenu = false;
+
+  editorSideMenu.addEventListener("mouseenter", () => {
+    isHoveringMenu = true;
+    if (hideTimeout) {
+      clearTimeout(hideTimeout);
+      hideTimeout = null;
+    }
+    editorSideMenu.classList.add("side-menu-visible");
+    editorSideMenu.classList.remove("side-menu-hidden");
+  });
+
+  editorSideMenu.addEventListener("mouseleave", () => {
+    isHoveringMenu = false;
+    hideTimeout = setTimeout(() => {
+      if (!isHoveringMenu) {
+        hideSideMenu();
+      }
+    }, 300);
+  });
+
   // side menu view actions
   const hideSideMenu = () => {
+    if (isHoveringMenu) return;
+    editorSideMenu?.classList.remove("side-menu-visible");
     if (!editorSideMenu?.classList.contains("side-menu-hidden")) editorSideMenu?.classList.add("side-menu-hidden");
   };
-  const showSideMenu = () => editorSideMenu?.classList.remove("side-menu-hidden");
+  const showSideMenu = () => {
+    if (hideTimeout) {
+      clearTimeout(hideTimeout);
+      hideTimeout = null;
+    }
+    editorSideMenu?.classList.remove("side-menu-hidden");
+  };
   // side menu elements
   const { view: dragHandleView, domEvents: dragHandleDOMEvents } = DragHandlePlugin(options);
   const { view: aiHandleView, domEvents: aiHandleDOMEvents } = AIHandlePlugin(options);
@@ -172,7 +202,11 @@ const SideMenu = (options: SideMenuPluginProps) => {
           }
         },
         // keydown: () => hideSideMenu(),
-        mousewheel: () => hideSideMenu(),
+        mousewheel: () => {
+          if (!isHoveringMenu) {
+            hideTimeout = setTimeout(() => hideSideMenu(), 200);
+          }
+        },
         dragenter: (view) => {
           if (handlesConfig.dragDrop) {
             dragHandleDOMEvents?.dragenter?.(view);
