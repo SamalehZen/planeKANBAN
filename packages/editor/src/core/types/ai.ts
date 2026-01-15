@@ -19,3 +19,9 @@ export type TAIHandler = {
   menu?: (props: TAIMenuProps) => React.ReactNode;
   onSelectionAction?: TAISelectionHandler;
 };
+
+export type TSpeechHandler = {
+  onStart: (nodeInfo?: { from: number; to: number }) => void;
+  onStop: () => void;
+  isRecording: () => boolean;
+};

@@ -17,6 +17,7 @@ import type {
 import type {
   IMarking,
   TAIHandler,
+  TSpeechHandler,
   TDisplayConfig,
   TDocumentEventEmitter,
   TDocumentEventsServer,
@@ -179,14 +180,20 @@ export type IEditorProps = {
   workItemIdentifier?: string | null;
 };
 
-export type ILiteTextEditorProps = IEditorProps;
+export type ILiteTextEditorProps = IEditorProps & {
+  aiHandler?: TAIHandler;
+  speechHandler?: TSpeechHandler;
+};
 
 export type IRichTextEditorProps = IEditorProps & {
+  aiHandler?: TAIHandler;
+  speechHandler?: TSpeechHandler;
   dragDropEnabled?: boolean;
 };
 
 export type ICollaborativeDocumentEditorProps = Omit<IEditorProps, "initialValue" | "onEnterKeyPress" | "value"> & {
   aiHandler?: TAIHandler;
+  speechHandler?: TSpeechHandler;
   documentLoaderClassName?: string;
   dragDropEnabled?: boolean;
   editable: boolean;

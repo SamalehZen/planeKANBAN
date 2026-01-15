@@ -11,6 +11,8 @@ import type { EditorRefApi, IRichTextEditorProps } from "@/types";
 
 function RichTextEditor(props: IRichTextEditorProps) {
   const {
+    aiHandler,
+    speechHandler,
     bubbleMenuEnabled = true,
     disabledExtensions,
     dragDropEnabled,
@@ -25,8 +27,10 @@ function RichTextEditor(props: IRichTextEditorProps) {
     const extensions = [
       ...externalExtensions,
       SideMenuExtension({
-        aiEnabled: false,
+        aiEnabled: !disabledExtensions?.includes("ai"),
         dragDropEnabled: !!dragDropEnabled,
+        speechEnabled: !!speechHandler,
+        speechCallbacks: speechHandler,
       }),
       ...RichTextEditorAdditionalExtensions({
         disabledExtensions,
@@ -45,6 +49,7 @@ function RichTextEditor(props: IRichTextEditorProps) {
         <>
           {editor && bubbleMenuEnabled && (
             <EditorBubbleMenu
+              aiSelectionHandler={aiHandler?.onSelectionAction}
               disabledExtensions={disabledExtensions}
               editor={editor}
               extendedEditorProps={extendedEditorProps}

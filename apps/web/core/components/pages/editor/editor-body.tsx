@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { observer } from "mobx-react";
 // plane imports
 import { LIVE_BASE_PATH, LIVE_BASE_URL } from "@plane/constants";
@@ -15,6 +15,7 @@ import type {
   TServerHandler,
 } from "@plane/editor";
 import { AI_EDITOR_TASKS } from "@plane/constants";
+import { useSpeechToText } from "@plane/hooks";
 import { useTranslation } from "@plane/i18n";
 import type { TSearchEntityRequestPayload, TSearchResponse, TWebhookConnectionQueryParams } from "@plane/types";
 import { ERowVariant, Row } from "@plane/ui";
@@ -151,6 +152,80 @@ export const PageEditorBody = observer(function PageEditorBody(props: Props) {
     });
   }, [pageId, setSyncingStatus, onCollaborationStateChange]);
 
+  // Speech-to-text integration
+  const [isRecordingState, setIsRecordingState] = useState(false);
+  const [currentNodeInfo, setCurrentNodeInfo] = useState<{ from: number; to: number } | null>(null);
+  const streamingTextRef = useRef<string>("");
+
+  const handleSpeechTranscript = useCallback(
+    (text: string, isFinal: boolean) => {
+      if (!editorRef?.current) return;
+      
+      const editor = editorRef.current;
+      
+      if (currentNodeInfo) {
+        if (isFinal) {
+          streamingTextRef.current = "";
+        } else {
+          streamingTextRef.current = text;
+          try {
+            const view = (editor as any).editor?.view;
+            if (view) {
+              const { state, dispatch } = view;
+              const tr = state.tr.replaceWith(
+                currentNodeInfo.from,
+                currentNodeInfo.to,
+                state.schema.text(text || " ")
+              );
+              dispatch(tr);
+              setCurrentNodeInfo({
+                from: currentNodeInfo.from,
+                to: currentNodeInfo.from + (text?.length || 1),
+              });
+            }
+          } catch (e) {
+            console.error("Error updating text:", e);
+          }
+        }
+      } else {
+        if (isFinal) {
+          editor.insertTextAtCursor(text + " ");
+        }
+      }
+    },
+    [editorRef, currentNodeInfo]
+  );
+
+  const {
+    isRecording,
+    startRecording,
+    stopRecording,
+  } = useSpeechToText({
+    workspaceSlug: workspaceSlug || "",
+    onTranscript: handleSpeechTranscript,
+  });
+
+  useEffect(() => {
+    setIsRecordingState(isRecording);
+  }, [isRecording]);
+
+  const speechHandler = useMemo(
+    () => ({
+      onStart: (nodeInfo?: { from: number; to: number }) => {
+        setCurrentNodeInfo(nodeInfo || null);
+        streamingTextRef.current = "";
+        startRecording();
+      },
+      onStop: () => {
+        stopRecording();
+        setCurrentNodeInfo(null);
+        streamingTextRef.current = "";
+      },
+      isRecording: () => isRecordingState,
+    }),
+    [startRecording, stopRecording, isRecordingState]
+  );
+
   const getAIMenu = useCallback(
     ({ isOpen, onClose }: TAIMenuProps) => (
       <EditorAIMenu
@@ -169,20 +244,33 @@ export const PageEditorBody = observer(function PageEditorBody(props: Props) {
       if (!workspaceSlug) return null;
       try {
         const aiService = new AIService();
-        const taskPayload = {
-          task: payload.task,
-          text_input: payload.text,
-          casual_score: payload.casual_score,
-          formal_score: payload.formal_score,
-        };
-        if (payload.task === AI_EDITOR_TASKS.ASK_ANYTHING && payload.prompt) {
-          const result = await aiService.createGptTask(workspaceSlug, {
-            prompt: `${payload.prompt}\n\nTexte: ${payload.text}`,
-            task: "custom",
-          });
-          return result?.response || null;
+        let prompt = "";
+        switch (payload.task) {
+          case AI_EDITOR_TASKS.PARAPHRASE:
+            prompt = `Paraphrase le texte suivant en gardant le même sens mais avec des mots différents:\n\n${payload.text}`;
+            break;
+          case AI_EDITOR_TASKS.SIMPLIFY:
+            prompt = `Simplifie le texte suivant pour le rendre plus facile à comprendre:\n\n${payload.text}`;
+            break;
+          case AI_EDITOR_TASKS.EXPAND:
+            prompt = `Développe et enrichis le texte suivant avec plus de détails:\n\n${payload.text}`;
+            break;
+          case AI_EDITOR_TASKS.SUMMARIZE:
+            prompt = `Résume le texte suivant de manière concise:\n\n${payload.text}`;
+            break;
+          case AI_EDITOR_TASKS.GENERATE_TITLE:
+            prompt = `Génère un titre court et accrocheur pour le texte suivant:\n\n${payload.text}`;
+            break;
+          case AI_EDITOR_TASKS.ASK_ANYTHING:
+            prompt = payload.prompt ? `${payload.prompt}\n\nTexte: ${payload.text}` : payload.text;
+            break;
+          default:
+            prompt = payload.text;
         }
-        const result = await aiService.performEditorTask(workspaceSlug, taskPayload);
+        const result = await aiService.createGptTask(workspaceSlug, {
+          prompt,
+          task: payload.task,
+        });
         return result?.response || null;
       } catch (error) {
         console.error("AI action failed:", error);
@@ -320,6 +408,7 @@ export const PageEditorBody = observer(function PageEditorBody(props: Props) {
               menu: getAIMenu,
               onSelectionAction: handleAISelectionAction,
             }}
+            speechHandler={isContentEditable ? speechHandler : undefined}
             onAssetChange={updateAssetsList}
             extendedEditorProps={extendedEditorProps}
             isFetchingFallbackBinary={isFetchingFallbackBinary}

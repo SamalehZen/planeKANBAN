@@ -4,6 +4,7 @@ import { observer } from "mobx-react";
 import { Dialog, Transition } from "@headlessui/react";
 // hooks
 import { usePowerK } from "@/hooks/store/use-power-k";
+import { useParams } from "next/navigation";
 // local imports
 import type { TPowerKCommandConfig, TPowerKContext } from "../../core/types";
 import type { TPowerKCommandsListProps } from "./commands-list";
@@ -153,6 +154,7 @@ export const ProjectsAppPowerKModalWrapper = observer(function ProjectsAppPowerK
                     context={context}
                     onSearchChange={setSearchTerm}
                     searchTerm={searchTerm}
+                    workspaceSlug={context.params.workspaceSlug?.toString()}
                   />
                   <Command.List className="vertical-scrollbar scrollbar-sm max-h-96 overflow-scroll outline-none">
                     <CommandsListComponent

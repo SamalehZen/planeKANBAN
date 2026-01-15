@@ -1,9 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 // plane constants
-import type { EIssueCommentAccessSpecifier } from "@plane/constants";
+import { AI_EDITOR_TASKS, type EIssueCommentAccessSpecifier } from "@plane/constants";
 // plane imports
 import { LiteTextEditorWithRef } from "@plane/editor";
-import type { EditorRefApi, ILiteTextEditorProps, TFileHandler } from "@plane/editor";
+import type { EditorRefApi, ILiteTextEditorProps, TAIActionPayload, TFileHandler } from "@plane/editor";
 import { useTranslation } from "@plane/i18n";
 import type { MakeOptional } from "@plane/types";
 import { cn, isCommentEmpty } from "@plane/utils";
@@ -19,6 +19,8 @@ import { useEditorFlagging } from "@/plane-web/hooks/use-editor-flagging";
 // plane web service
 import { WorkspaceService } from "@/plane-web/services";
 import { LiteToolbar } from "./lite-toolbar";
+// services
+import { AIService } from "@/services/ai.service";
 const workspaceService = new WorkspaceService();
 
 type LiteTextEditorWrapperProps = MakeOptional<
@@ -111,6 +113,47 @@ export const LiteTextEditor = React.forwardRef(function LiteTextEditor(
   // derived values
   const isEmpty = isCommentEmpty(props.initialValue);
 
+  const handleAISelectionAction = useCallback(
+    async (payload: TAIActionPayload): Promise<string | null> => {
+      if (!workspaceSlug) return null;
+      try {
+        const aiService = new AIService();
+        let prompt = "";
+        switch (payload.task) {
+          case AI_EDITOR_TASKS.PARAPHRASE:
+            prompt = `Paraphrase le texte suivant en gardant le même sens mais avec des mots différents:\n\n${payload.text}`;
+            break;
+          case AI_EDITOR_TASKS.SIMPLIFY:
+            prompt = `Simplifie le texte suivant pour le rendre plus facile à comprendre:\n\n${payload.text}`;
+            break;
+          case AI_EDITOR_TASKS.EXPAND:
+            prompt = `Développe et enrichis le texte suivant avec plus de détails:\n\n${payload.text}`;
+            break;
+          case AI_EDITOR_TASKS.SUMMARIZE:
+            prompt = `Résume le texte suivant de manière concise:\n\n${payload.text}`;
+            break;
+          case AI_EDITOR_TASKS.GENERATE_TITLE:
+            prompt = `Génère un titre court et accrocheur pour le texte suivant:\n\n${payload.text}`;
+            break;
+          case AI_EDITOR_TASKS.ASK_ANYTHING:
+            prompt = payload.prompt ? `${payload.prompt}\n\nTexte: ${payload.text}` : payload.text;
+            break;
+          default:
+            prompt = payload.text;
+        }
+        const result = await aiService.createGptTask(workspaceSlug, {
+          prompt,
+          task: payload.task,
+        });
+        return result?.response || null;
+      } catch (error) {
+        console.error("AI action failed:", error);
+        return null;
+      }
+    },
+    [workspaceSlug]
+  );
+
   return (
     <div
       className={cn(
@@ -162,6 +205,9 @@ export const LiteTextEditor = React.forwardRef(function LiteTextEditor(
               "p-2": !editable,
             })}
             extendedEditorProps={{}}
+            aiHandler={{
+              onSelectionAction: handleAISelectionAction,
+            }}
             editorClassName={editorClassName}
             {...rest}
           />
@@ -211,6 +257,7 @@ export const LiteTextEditor = React.forwardRef(function LiteTextEditor(
             editorRef={editorRef}
             showSubmitButton={showSubmitButton}
             submitButtonText={submitButtonText}
+            workspaceSlug={workspaceSlug}
           />
         </div>
       )}

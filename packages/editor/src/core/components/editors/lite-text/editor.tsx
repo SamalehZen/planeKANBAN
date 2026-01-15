@@ -1,13 +1,22 @@
 import { forwardRef, useMemo } from "react";
 // components
 import { EditorWrapper } from "@/components/editors/editor-wrapper";
+import { EditorBubbleMenu } from "@/components/menus";
 // extensions
 import { EnterKeyExtension } from "@/extensions";
 // types
 import type { EditorRefApi, ILiteTextEditorProps } from "@/types";
 
 function LiteTextEditor(props: ILiteTextEditorProps) {
-  const { onEnterKeyPress, disabledExtensions, extensions: externalExtensions = [] } = props;
+  const {
+    aiHandler,
+    bubbleMenuEnabled = true,
+    disabledExtensions,
+    extendedEditorProps,
+    flaggedExtensions,
+    onEnterKeyPress,
+    extensions: externalExtensions = [],
+  } = props;
 
   const extensions = useMemo(() => {
     const resolvedExtensions = [...externalExtensions];
@@ -19,7 +28,23 @@ function LiteTextEditor(props: ILiteTextEditorProps) {
     return resolvedExtensions;
   }, [externalExtensions, disabledExtensions, onEnterKeyPress]);
 
-  return <EditorWrapper {...props} extensions={extensions} />;
+  return (
+    <EditorWrapper {...props} extensions={extensions}>
+      {(editor) => (
+        <>
+          {editor && bubbleMenuEnabled && (
+            <EditorBubbleMenu
+              aiSelectionHandler={aiHandler?.onSelectionAction}
+              disabledExtensions={disabledExtensions}
+              editor={editor}
+              extendedEditorProps={extendedEditorProps}
+              flaggedExtensions={flaggedExtensions}
+            />
+          )}
+        </>
+      )}
+    </EditorWrapper>
+  );
 }
 
 const LiteTextEditorWithRef = forwardRef(function LiteTextEditorWithRef(

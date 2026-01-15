@@ -18,6 +18,7 @@ import type {
   IEditorProps,
   TEditorHookProps,
   EditorTitleRefApi,
+  TSpeechHandler,
 } from "@/types";
 // local imports
 import { useEditorNavigation } from "./use-editor-navigation";
@@ -29,6 +30,7 @@ type UseCollaborativeEditorArgs = Omit<TCollaborativeEditorHookProps, "realtimeC
   actions: {
     signalForcedClose: (value: boolean) => void;
   };
+  speechHandler?: TSpeechHandler;
 };
 
 export const useCollaborativeEditor = (props: UseCollaborativeEditorArgs) => {
@@ -60,6 +62,7 @@ export const useCollaborativeEditor = (props: UseCollaborativeEditorArgs) => {
     updatePageProperties,
     user,
     actions,
+    speechHandler,
   } = props;
 
   const { mainNavigationExtension, titleNavigationExtension, setMainEditor, setTitleEditor } = useEditorNavigation();
@@ -70,6 +73,8 @@ export const useCollaborativeEditor = (props: UseCollaborativeEditorArgs) => {
       SideMenuExtension({
         aiEnabled: !disabledExtensions?.includes("ai"),
         dragDropEnabled,
+        speechEnabled: !!speechHandler,
+        speechCallbacks: speechHandler,
       }),
       HeadingListExtension,
       Collaboration.configure({
