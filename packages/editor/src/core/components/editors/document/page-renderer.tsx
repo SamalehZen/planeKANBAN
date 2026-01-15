@@ -33,10 +33,12 @@ type Props = {
   tabIndex?: number;
   provider?: HocuspocusProvider;
   state?: TCollabValue["state"];
+  aiSelectionHandler?: TAIHandler["onSelectionAction"];
 };
 
 export function PageRenderer(props: Props) {
   const {
+    aiSelectionHandler,
     bubbleMenuEnabled,
     disabledExtensions,
     displayConfig,
@@ -95,6 +97,7 @@ export function PageRenderer(props: Props) {
               <div>
                 {bubbleMenuEnabled && (
                   <EditorBubbleMenu
+                    aiSelectionHandler={aiSelectionHandler}
                     editor={editor}
                     disabledExtensions={disabledExtensions}
                     extendedEditorProps={extendedEditorProps}
