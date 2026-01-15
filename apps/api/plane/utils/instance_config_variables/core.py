@@ -219,6 +219,15 @@ llm_config_variables = [
     },
 ]
 
+speech_config_variables = [
+    {
+        "key": "ASSEMBLYAI_API_KEY",
+        "value": os.environ.get("ASSEMBLYAI_API_KEY", ""),
+        "category": "SPEECH",
+        "is_encrypted": True,
+    },
+]
+
 unsplash_config_variables = [
     {
         "key": "UNSPLASH_ACCESS_KEY",
@@ -252,6 +261,7 @@ core_config_variables = [
     *gitea_config_variables,
     *smtp_config_variables,
     *llm_config_variables,
+    *speech_config_variables,
     *unsplash_config_variables,
     *intercom_config_variables,
 ]
