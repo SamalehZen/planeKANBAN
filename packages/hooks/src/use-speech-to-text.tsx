@@ -27,6 +27,7 @@ export const useSpeechToText = (options: UseSpeechToTextOptions): UseSpeechToTex
   const streamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const processedTurnsRef = useRef<Set<number>>(new Set());
 
   const cleanup = useCallback(() => {
     console.log("[Speech] Cleaning up...");
@@ -112,7 +113,8 @@ export const useSpeechToText = (options: UseSpeechToTextOptions): UseSpeechToTex
       console.log("[Speech] Microphone access granted");
 
       console.log("[Speech] Connecting to AssemblyAI WebSocket...");
-      const ws = new WebSocket(`wss://streaming.assemblyai.com/v3/ws?sample_rate=16000&format_turns=true&token=${tokenResponse.token}`);
+      processedTurnsRef.current.clear();
+      const ws = new WebSocket(`wss://streaming.assemblyai.com/v3/ws?sample_rate=16000&format_turns=true&speech_model=universal-streaming-multilingual&token=${tokenResponse.token}`);
       websocketRef.current = ws;
 
       ws.onopen = () => {
@@ -158,24 +160,24 @@ export const useSpeechToText = (options: UseSpeechToTextOptions): UseSpeechToTex
           }
 
           if (data.type === "Turn" && data.transcript) {
+            const turnOrder = data.turn_order;
             const isFinal = data.end_of_turn && data.turn_is_formatted;
-            console.log("[Speech] Turn details:", { 
-              transcript: data.transcript, 
-              end_of_turn: data.end_of_turn, 
-              turn_is_formatted: data.turn_is_formatted,
-              isFinal 
-            });
             
             if (isFinal) {
-              console.log("[Speech] Final formatted transcript:", data.transcript);
+              if (processedTurnsRef.current.has(turnOrder)) {
+                console.log("[Speech] Skipping already processed turn:", turnOrder);
+                return;
+              }
+              processedTurnsRef.current.add(turnOrder);
+              console.log("[Speech] Final transcript (turn ", turnOrder, "):", data.transcript);
               setInterimText("");
               onTranscript(data.transcript, true);
             } else {
               setInterimText(data.transcript);
-              onTranscript(data.transcript, false);
             }
           } else if (data.type === "Begin") {
-            console.log("[Speech] Session started");
+            console.log("[Speech] Session started (multilingual)");
+            processedTurnsRef.current.clear();
           } else if (data.type === "Termination") {
             console.log("[Speech] Session terminated:", data.reason);
           }

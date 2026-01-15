@@ -156,11 +156,10 @@ export const PageEditorBody = observer(function PageEditorBody(props: Props) {
   const [isRecordingState, setIsRecordingState] = useState(false);
   const [currentNodeInfo, setCurrentNodeInfo] = useState<{ from: number; to: number } | null>(null);
   const streamingTextRef = useRef<string>("");
+  const lastInsertedTextRef = useRef<string>("");
 
   const handleSpeechTranscript = useCallback(
     (text: string, isFinal: boolean) => {
-      console.log("[Speech] handleSpeechTranscript called:", { text, isFinal, hasEditorRef: !!editorRef?.current, hasForwardRef: !!editorForwardRef?.current });
-      
       const editor = editorForwardRef?.current || editorRef?.current;
       if (!editor) {
         console.error("[Speech] No editor ref available");
@@ -193,10 +192,14 @@ export const PageEditorBody = observer(function PageEditorBody(props: Props) {
         }
       } else {
         if (isFinal && text) {
+          if (lastInsertedTextRef.current === text) {
+            console.log("[Speech] Skipping duplicate insertion:", text);
+            return;
+          }
+          lastInsertedTextRef.current = text;
           console.log("[Speech] Inserting final text at cursor:", text);
           try {
             editor.insertTextAtCursor(text + " ");
-            console.log("[Speech] Text inserted successfully");
           } catch (e) {
             console.error("[Speech] Error inserting text:", e);
           }
@@ -224,12 +227,14 @@ export const PageEditorBody = observer(function PageEditorBody(props: Props) {
       onStart: (nodeInfo?: { from: number; to: number }) => {
         setCurrentNodeInfo(nodeInfo || null);
         streamingTextRef.current = "";
+        lastInsertedTextRef.current = "";
         startRecording();
       },
       onStop: () => {
         stopRecording();
         setCurrentNodeInfo(null);
         streamingTextRef.current = "";
+        lastInsertedTextRef.current = "";
       },
       isRecording: () => isRecordingState,
     }),
