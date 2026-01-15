@@ -1,8 +1,9 @@
-import { forwardRef, useCallback } from "react";
+import { forwardRef, useCallback, useState, useRef, useEffect } from "react";
 // plane imports
 import { AI_EDITOR_TASKS } from "@plane/constants";
 import { RichTextEditorWithRef } from "@plane/editor";
 import type { EditorRefApi, IRichTextEditorProps, TAIActionPayload, TFileHandler } from "@plane/editor";
+import { useSpeechToText } from "@plane/hooks";
 import type { MakeOptional, TSearchEntityRequestPayload, TSearchResponse } from "@plane/types";
 import { cn } from "@plane/utils";
 // components
@@ -68,6 +69,38 @@ export const RichTextEditor = forwardRef(function RichTextEditor(
     workspaceSlug,
   });
 
+  // Speech-to-text integration
+  const editorRefInternal = useRef<EditorRefApi | null>(null);
+  const [isRecordingState, setIsRecordingState] = useState(false);
+
+  const handleSpeechTranscript = useCallback(
+    (text: string, isFinal: boolean) => {
+      if (isFinal && editorRefInternal.current) {
+        editorRefInternal.current.insertTextAtCursor(text + " ");
+      }
+    },
+    []
+  );
+
+  const {
+    isRecording,
+    startRecording,
+    stopRecording,
+  } = useSpeechToText({
+    workspaceSlug: workspaceSlug || "",
+    onTranscript: handleSpeechTranscript,
+  });
+
+  useEffect(() => {
+    setIsRecordingState(isRecording);
+  }, [isRecording]);
+
+  const speechHandler = {
+    onStart: startRecording,
+    onStop: stopRecording,
+    isRecording: () => isRecordingState,
+  };
+
   const handleAISelectionAction = useCallback(
     async (payload: TAIActionPayload): Promise<string | null> => {
       if (!workspaceSlug) return null;
@@ -109,9 +142,21 @@ export const RichTextEditor = forwardRef(function RichTextEditor(
     [workspaceSlug]
   );
 
+  const handleRef = useCallback(
+    (editorRef: EditorRefApi | null) => {
+      editorRefInternal.current = editorRef;
+      if (typeof ref === "function") {
+        ref(editorRef);
+      } else if (ref) {
+        ref.current = editorRef;
+      }
+    },
+    [ref]
+  );
+
   return (
     <RichTextEditorWithRef
-      ref={ref}
+      ref={handleRef}
       disabledExtensions={[...richTextEditorExtensions.disabled, ...(additionalDisabledExtensions ?? [])]}
       editable={editable}
       flaggedExtensions={richTextEditorExtensions.flagged}
@@ -138,6 +183,7 @@ export const RichTextEditor = forwardRef(function RichTextEditor(
       aiHandler={{
         onSelectionAction: handleAISelectionAction,
       }}
+      speechHandler={editable ? speechHandler : undefined}
       {...rest}
       containerClassName={cn("relative pl-3 pb-3", containerClassName)}
     />

@@ -48,6 +48,7 @@ function CollaborativeDocumentEditorInner(props: ICollaborativeDocumentEditorPro
     titleRef,
     updatePageProperties,
     isFetchingFallbackBinary,
+    speechHandler,
   } = props;
 
   // Get non-null provider from context
@@ -81,6 +82,7 @@ function CollaborativeDocumentEditorInner(props: ICollaborativeDocumentEditorPro
     updatePageProperties,
     user,
     actions,
+    speechHandler,
   });
 
   const editorContainerClassNames = getEditorClassNames({

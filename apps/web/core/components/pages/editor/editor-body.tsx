@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { observer } from "mobx-react";
 // plane imports
 import { LIVE_BASE_PATH, LIVE_BASE_URL } from "@plane/constants";
@@ -15,6 +15,7 @@ import type {
   TServerHandler,
 } from "@plane/editor";
 import { AI_EDITOR_TASKS } from "@plane/constants";
+import { useSpeechToText } from "@plane/hooks";
 import { useTranslation } from "@plane/i18n";
 import type { TSearchEntityRequestPayload, TSearchResponse, TWebhookConnectionQueryParams } from "@plane/types";
 import { ERowVariant, Row } from "@plane/ui";
@@ -150,6 +151,40 @@ export const PageEditorBody = observer(function PageEditorBody(props: Props) {
       isServerDisconnected: false,
     });
   }, [pageId, setSyncingStatus, onCollaborationStateChange]);
+
+  // Speech-to-text integration
+  const [isRecordingState, setIsRecordingState] = useState(false);
+
+  const handleSpeechTranscript = useCallback(
+    (text: string, isFinal: boolean) => {
+      if (isFinal && editorRef?.current) {
+        editorRef.current.insertTextAtCursor(text + " ");
+      }
+    },
+    [editorRef]
+  );
+
+  const {
+    isRecording,
+    startRecording,
+    stopRecording,
+  } = useSpeechToText({
+    workspaceSlug: workspaceSlug || "",
+    onTranscript: handleSpeechTranscript,
+  });
+
+  useEffect(() => {
+    setIsRecordingState(isRecording);
+  }, [isRecording]);
+
+  const speechHandler = useMemo(
+    () => ({
+      onStart: startRecording,
+      onStop: stopRecording,
+      isRecording: () => isRecordingState,
+    }),
+    [startRecording, stopRecording, isRecordingState]
+  );
 
   const getAIMenu = useCallback(
     ({ isOpen, onClose }: TAIMenuProps) => (
@@ -333,6 +368,7 @@ export const PageEditorBody = observer(function PageEditorBody(props: Props) {
               menu: getAIMenu,
               onSelectionAction: handleAISelectionAction,
             }}
+            speechHandler={isContentEditable ? speechHandler : undefined}
             onAssetChange={updateAssetsList}
             extendedEditorProps={extendedEditorProps}
             isFetchingFallbackBinary={isFetchingFallbackBinary}
