@@ -9,6 +9,7 @@ import { cn } from "@plane/utils";
 // components
 import type { EditorMenuItem } from "@/components/menus";
 import {
+  AISelectionMenu,
   BackgroundColorItem,
   BoldItem,
   BubbleMenuColorSelector,
@@ -26,7 +27,7 @@ import { CORE_EXTENSIONS } from "@/constants/extension";
 // extensions
 import { isCellSelection } from "@/extensions/table/table/utilities/helpers";
 // types
-import type { IEditorPropsExtended, TEditorCommands, TExtensions } from "@/types";
+import type { IEditorPropsExtended, TAISelectionHandler, TEditorCommands, TExtensions } from "@/types";
 // local imports
 import { TextAlignmentSelector } from "./alignment-selector";
 import { BubbleMenuLinkSelector } from "./link-selector";
@@ -61,6 +62,7 @@ export type EditorStateType = {
 };
 
 type Props = {
+  aiSelectionHandler?: TAISelectionHandler;
   disabledExtensions: TExtensions[];
   editor: Editor;
   extendedEditorProps: IEditorPropsExtended;
@@ -68,7 +70,7 @@ type Props = {
 };
 
 export function EditorBubbleMenu(props: Props) {
-  const { editor } = props;
+  const { aiSelectionHandler, editor } = props;
   // states
   const [isSelecting, setIsSelecting] = useState(false);
   // refs
@@ -222,6 +224,11 @@ export function EditorBubbleMenu(props: Props) {
             ))}
           </div>
           <TextAlignmentSelector editor={editor} editorState={editorState} />
+          {aiSelectionHandler && (
+            <div className="px-2 border-l border-subtle-1">
+              <AISelectionMenu editor={editor} onAction={aiSelectionHandler} />
+            </div>
+          )}
         </div>
       )}
     </BubbleMenu>

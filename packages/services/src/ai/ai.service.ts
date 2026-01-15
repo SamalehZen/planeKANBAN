@@ -65,4 +65,18 @@ export class AIService extends APIService {
         throw error?.response?.data;
       });
   }
+
+  async processText(
+    workspaceSlug: string,
+    data: { task: AI_EDITOR_TASKS; text: string }
+  ): Promise<{ response: string; response_html: string }> {
+    return this.post(`/api/workspaces/${workspaceSlug}/ai-assistant/`, {
+      task: data.task,
+      prompt: data.text,
+    })
+      .then((res) => res?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
 }

@@ -1,3 +1,4 @@
+export * from "./ai-menu";
 export * from "./avatar";
 export * from "./badge";
 export * from "./breadcrumbs";
