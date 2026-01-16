@@ -8,6 +8,7 @@ interface UseSpeechToTextOptions {
   silenceThreshold?: number;
   onVolumeChange?: (volume: number) => void;
   onRecordingTime?: (seconds: number) => void;
+  microphoneSensitivity?: number;
 }
 
 interface UseSpeechToTextReturn {
@@ -20,7 +21,16 @@ interface UseSpeechToTextReturn {
   currentVolume: number;
 }
 
-const SILENCE_VOLUME_THRESHOLD = 5;
+const SILENCE_VOLUME_THRESHOLD = 2;
+const DEFAULT_SENSITIVITY = 3.0;
+
+const detectDevice = (): { isIpad: boolean; isMobile: boolean } => {
+  if (typeof navigator === "undefined") return { isIpad: false, isMobile: false };
+  const ua = navigator.userAgent.toLowerCase();
+  const isIpad = ua.includes("ipad") || (ua.includes("macintosh") && "ontouchend" in document);
+  const isMobile = /iphone|ipod|android|webos|blackberry|windows phone/i.test(ua);
+  return { isIpad, isMobile };
+};
 
 export const useSpeechToText = (options: UseSpeechToTextOptions): UseSpeechToTextReturn => {
   const { 
@@ -29,7 +39,8 @@ export const useSpeechToText = (options: UseSpeechToTextOptions): UseSpeechToTex
     onError, 
     silenceThreshold = 5000, 
     onVolumeChange, 
-    onRecordingTime 
+    onRecordingTime,
+    microphoneSensitivity
   } = options;
 
   const [isRecording, setIsRecording] = useState(false);
@@ -43,19 +54,24 @@ export const useSpeechToText = (options: UseSpeechToTextOptions): UseSpeechToTex
   const streamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const gainNodeRef = useRef<GainNode | null>(null);
   const processedTurnsRef = useRef<Set<number>>(new Set());
   const recordingStartRef = useRef<number | null>(null);
   const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const accumulatedTextRef = useRef<string>("");
   const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const calculateVolume = useCallback((inputData: Float32Array): number => {
+  const calculateVolume = useCallback((inputData: Float32Array, sensitivity: number): number => {
     let sum = 0;
+    let max = 0;
     for (let i = 0; i < inputData.length; i++) {
+      const abs = Math.abs(inputData[i]);
       sum += inputData[i] * inputData[i];
+      if (abs > max) max = abs;
     }
     const rms = Math.sqrt(sum / inputData.length);
-    return Math.min(100, Math.round(rms * 500));
+    const amplifiedRms = rms * sensitivity * 500;
+    return Math.min(100, Math.round(amplifiedRms));
   }, []);
 
   const cleanup = useCallback(() => {
@@ -74,6 +90,11 @@ export const useSpeechToText = (options: UseSpeechToTextOptions): UseSpeechToTex
     if (processorRef.current) {
       processorRef.current.disconnect();
       processorRef.current = null;
+    }
+
+    if (gainNodeRef.current) {
+      gainNodeRef.current.disconnect();
+      gainNodeRef.current = null;
     }
 
     if (audioContextRef.current) {
@@ -157,6 +178,12 @@ export const useSpeechToText = (options: UseSpeechToTextOptions): UseSpeechToTex
     console.log("[Speech] Starting recording for workspace:", workspaceSlug);
     accumulatedTextRef.current = "";
 
+    const { isIpad, isMobile } = detectDevice();
+    console.log("[Speech] Device detection - iPad:", isIpad, "Mobile:", isMobile);
+
+    const sensitivity = microphoneSensitivity ?? (isIpad ? 5.0 : isMobile ? 2.5 : DEFAULT_SENSITIVITY);
+    const gainValue = isIpad ? 4.0 : isMobile ? 2.0 : 1.5;
+
     try {
       setIsConnecting(true);
 
@@ -173,17 +200,40 @@ export const useSpeechToText = (options: UseSpeechToTextOptions): UseSpeechToTex
         throw new Error("No token received from backend. Check your AssemblyAI API key in admin settings.");
       }
 
-      console.log("[Speech] Requesting microphone access...");
+      console.log("[Speech] Requesting microphone access with enhanced settings for device...");
+      
+      const audioConstraints: MediaTrackConstraints = {
+        channelCount: 1,
+        echoCancellation: true,
+        noiseSuppression: !isIpad,
+        autoGainControl: true,
+      };
+
+      if (!isIpad) {
+        audioConstraints.sampleRate = 16000;
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          sampleRate: 16000,
-          channelCount: 1,
-          echoCancellation: true,
-          noiseSuppression: true,
-        },
+        audio: audioConstraints,
       });
       streamRef.current = stream;
       console.log("[Speech] Microphone access granted");
+
+      const audioTrack = stream.getAudioTracks()[0];
+      if (audioTrack) {
+        const capabilities = audioTrack.getCapabilities?.() || {};
+        console.log("[Speech] Audio track capabilities:", capabilities);
+        
+        try {
+          await audioTrack.applyConstraints({
+            autoGainControl: true,
+            noiseSuppression: !isIpad,
+            echoCancellation: true,
+          });
+        } catch (e) {
+          console.log("[Speech] Could not apply additional constraints:", e);
+        }
+      }
 
       console.log("[Speech] Connecting to AssemblyAI WebSocket...");
       processedTurnsRef.current.clear();
@@ -200,6 +250,12 @@ export const useSpeechToText = (options: UseSpeechToTextOptions): UseSpeechToTex
         audioContextRef.current = audioContext;
 
         const source = audioContext.createMediaStreamSource(stream);
+        
+        const gainNode = audioContext.createGain();
+        gainNode.gain.value = gainValue;
+        gainNodeRef.current = gainNode;
+        console.log("[Speech] Gain node created with value:", gainValue);
+
         const processor = audioContext.createScriptProcessor(4096, 1, 1);
         processorRef.current = processor;
 
@@ -207,7 +263,7 @@ export const useSpeechToText = (options: UseSpeechToTextOptions): UseSpeechToTex
         processor.onaudioprocess = (e) => {
           const inputData = e.inputBuffer.getChannelData(0);
           
-          const volume = calculateVolume(inputData);
+          const volume = calculateVolume(inputData, sensitivity);
           setCurrentVolume(volume);
           onVolumeChange?.(volume);
 
@@ -225,18 +281,23 @@ export const useSpeechToText = (options: UseSpeechToTextOptions): UseSpeechToTex
           }
 
           if (ws.readyState === WebSocket.OPEN) {
-            const pcmData = floatTo16BitPCM(inputData);
+            const amplifiedData = new Float32Array(inputData.length);
+            for (let i = 0; i < inputData.length; i++) {
+              amplifiedData[i] = Math.max(-1, Math.min(1, inputData[i] * gainValue));
+            }
+            const pcmData = floatTo16BitPCM(amplifiedData);
             ws.send(pcmData);
             audioChunkCount++;
             if (audioChunkCount % 50 === 0) {
-              console.log(`[Speech] Sent ${audioChunkCount} audio chunks`);
+              console.log(`[Speech] Sent ${audioChunkCount} audio chunks, current volume: ${volume}`);
             }
           }
         };
 
-        source.connect(processor);
+        source.connect(gainNode);
+        gainNode.connect(processor);
         processor.connect(audioContext.destination);
-        console.log("[Speech] Audio processing started");
+        console.log("[Speech] Audio processing started with enhanced sensitivity");
       };
 
       ws.onmessage = (event) => {
@@ -301,7 +362,7 @@ export const useSpeechToText = (options: UseSpeechToTextOptions): UseSpeechToTex
         onError?.(err);
       }
     }
-  }, [workspaceSlug, isRecording, isConnecting, onTranscript, onError, cleanup, calculateVolume, onVolumeChange, silenceThreshold, finishRecordingAndProcess]);
+  }, [workspaceSlug, isRecording, isConnecting, onTranscript, onError, cleanup, calculateVolume, onVolumeChange, silenceThreshold, finishRecordingAndProcess, microphoneSensitivity]);
 
   const stopRecording = useCallback(() => {
     console.log("[Speech] Stop recording requested");
