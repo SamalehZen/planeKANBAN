@@ -150,20 +150,40 @@ export const PageEditorBody = observer(function PageEditorBody(props: Props) {
     const editor = editorForwardRef?.current || editorRef?.current;
     if (!editor || !content) return;
     
+    console.log("[PageEditor] Inserting content:", { content, intent });
+    
     if (intent === "todo" || intent === "planning") {
       const lines = content.split('\n').filter(l => l.trim());
-      const taskItems = lines
-        .filter(l => l.match(/^-\s*\[[ x]\]/))
-        .map(l => {
-          const text = l.replace(/^-\s*\[[ x]\]\s*/, '');
-          return `<li data-type="taskItem" data-checked="false"><p>${text}</p></li>`;
-        });
+      const taskItems: string[] = [];
+      
+      for (const line of lines) {
+        if (line.match(/^-\s*\[[ x]\]/)) {
+          const text = line.replace(/^-\s*\[[ x]\]\s*/, '').trim();
+          if (text) {
+            taskItems.push(`<li data-type="taskItem" data-checked="false"><p>${text}</p></li>`);
+          }
+        }
+      }
+      
+      console.log("[PageEditor] Task items found:", taskItems.length);
       
       if (taskItems.length > 0) {
-        editor.insertContentAtCursor(`<ul data-type="taskList">${taskItems.join('')}</ul>`);
+        const html = `<ul data-type="taskList">${taskItems.join('')}</ul>`;
+        console.log("[PageEditor] Inserting HTML:", html);
+        editor.insertContentAtCursor(html);
       } else {
+        console.log("[PageEditor] No task items found, inserting as text");
         editor.insertTextAtCursor(content + " ");
       }
+    } else if (intent === "note") {
+      editor.insertTextAtCursor(content + " ");
+    } else if (intent === "long_text") {
+      const htmlContent = content
+        .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+        .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+        .replace(/\n\n/g, '</p><p>')
+        .replace(/\n/g, '<br/>');
+      editor.insertContentAtCursor(`<p>${htmlContent}</p>`);
     } else {
       editor.insertTextAtCursor(content + " ");
     }

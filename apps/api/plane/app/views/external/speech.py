@@ -78,26 +78,96 @@ class SmartTranscriptEndpoint(BaseAPIView):
             )
 
         if requested_intent:
-            system_prompt = f"""Tu es un assistant spécialisé dans le formatage de texte en français.
+            if requested_intent == "todo":
+                system_prompt = f"""Tu es un assistant qui transforme du texte en liste de tâches.
 
-TÂCHE: Formater la transcription vocale selon le format demandé: {requested_intent}
+TÂCHE: Transformer cette transcription vocale en une liste de tâches à faire.
 
-FORMATS DE SORTIE:
-- Si "todo": Créer une liste de tâches avec checkboxes. Chaque élément sur une ligne: "- [ ] tâche"
-- Si "note": Créer un texte simple et bien structuré, paragraphes clairs
-- Si "planning": Créer des tâches avec dates/priorités: "- [ ] tâche | date: X | priorité: haute/moyenne/basse"  
-- Si "long_text": Créer un document structuré avec titres (## Titre) et sous-titres (### Sous-titre)
+RÈGLES STRICTES:
+1. Extraire CHAQUE action/tâche mentionnée
+2. Une tâche par ligne
+3. Format EXACT pour chaque ligne: - [ ] Description de la tâche
+4. Corriger l'orthographe et la grammaire
+5. Garder les tâches courtes et claires
 
-RÈGLES:
-1. Corriger l'orthographe et la grammaire
-2. Appliquer STRICTEMENT le format demandé ({requested_intent})
-3. Ne pas changer l'intention, juste formater
+EXEMPLE DE SORTIE:
+- [ ] Faire les courses
+- [ ] Appeler le médecin
+- [ ] Envoyer le rapport
 
-RÉPONDRE EN JSON:
+RÉPONDRE UNIQUEMENT EN JSON:
 {{
-  "intent": "{requested_intent}",
+  "intent": "todo",
   "confidence": 1.0,
-  "formatted_content": "contenu formaté selon {requested_intent}"
+  "formatted_content": "- [ ] tâche1\n- [ ] tâche2\n- [ ] tâche3"
+}}"""
+            elif requested_intent == "note":
+                system_prompt = f"""Tu es un assistant qui transforme du texte en note bien formatée.
+
+TÂCHE: Transformer cette transcription vocale en une note claire et lisible.
+
+RÈGLES STRICTES:
+1. Corriger l'orthographe et la grammaire
+2. Structurer en paragraphes si nécessaire
+3. Garder le sens original du texte
+4. Ajouter de la ponctuation appropriée
+5. NE PAS ajouter de titres ou de listes
+
+RÉPONDRE UNIQUEMENT EN JSON:
+{{
+  "intent": "note",
+  "confidence": 1.0,
+  "formatted_content": "Le texte de la note bien formaté ici."
+}}"""
+            elif requested_intent == "planning":
+                system_prompt = f"""Tu es un assistant qui transforme du texte en planning de tâches.
+
+TÂCHE: Transformer cette transcription vocale en un planning avec priorités.
+
+RÈGLES STRICTES:
+1. Extraire CHAQUE action/tâche mentionnée
+2. Une tâche par ligne
+3. Format EXACT: - [ ] Description | priorité: haute/moyenne/basse
+4. Si une date est mentionnée, ajouter: | date: JJ/MM
+5. Deviner la priorité selon le contexte (urgent = haute, normal = moyenne, peut attendre = basse)
+
+EXEMPLE DE SORTIE:
+- [ ] Réunion importante | priorité: haute | date: 15/01
+- [ ] Répondre aux emails | priorité: moyenne
+- [ ] Ranger le bureau | priorité: basse
+
+RÉPONDRE UNIQUEMENT EN JSON:
+{{
+  "intent": "planning",
+  "confidence": 1.0,
+  "formatted_content": "- [ ] tâche1 | priorité: haute\n- [ ] tâche2 | priorité: moyenne"
+}}"""
+            else:  # long_text / document
+                system_prompt = f"""Tu es un assistant qui transforme du texte en document structuré.
+
+TÂCHE: Transformer cette transcription vocale en document bien structuré.
+
+RÈGLES STRICTES:
+1. Corriger l'orthographe et la grammaire
+2. Ajouter un titre principal avec ## 
+3. Organiser en sections avec ### si le contenu est long
+4. Structurer en paragraphes clairs
+5. Garder le sens original
+
+EXEMPLE DE SORTIE:
+## Titre du document
+
+Premier paragraphe avec introduction.
+
+### Première section
+
+Contenu de la section.
+
+RÉPONDRE UNIQUEMENT EN JSON:
+{{
+  "intent": "long_text",
+  "confidence": 1.0,
+  "formatted_content": "## Titre\n\nContenu structuré ici."
 }}"""
         else:
             system_prompt = """Tu es un assistant spécialisé dans l'analyse de transcriptions vocales en français.
