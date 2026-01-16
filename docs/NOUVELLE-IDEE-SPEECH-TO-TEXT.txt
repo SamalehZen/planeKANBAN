@@ -1,0 +1,194 @@
+================================================================================
+           NOUVELLE IDÉE - SPEECH-TO-TEXT INTELLIGENT
+           Plane KANBAN - Système de Dictée Vocale Avancé
+================================================================================
+
+🎯 OBJECTIF
+================================================================================
+• Parler → structuration automatique
+• Zéro attente inutile
+• Zéro clic pendant la dictée
+• Résultat direct, propre, corrigé
+
+================================================================================
+🔁 ANCIENNE IDÉE (pour comparer)
+================================================================================
+
+1. Icône micro 🎤
+2. Tu parles librement
+3. Le système détecte l'intention
+4. Il propose plusieurs versions (todo, note, doc…)
+5. Tu choisis
+6. Traitement
+
+➡️ PROBLÈME : trop d'étapes, trop de décisions après avoir parlé.
+
+================================================================================
+✅ NOUVELLE IDÉE (beaucoup plus avancée)
+================================================================================
+
+Tu inverses la logique :
+👉 ON CHOISIT L'INTENTION AVANT DE PARLER
+
+Et ça, c'est très fort UX.
+
+================================================================================
+🧠 NOUVELLE EXPÉRIENCE UTILISATEUR (UX FLOW)
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+1️⃣ DÉCLENCHEMENT PAR LE CLAVIER (FN)
+────────────────────────────────────────────────────────────────────────────────
+
+• Appui une seule fois sur FN clavier pour le desktop
+• Pour iPad il restera l'icône UI
+• Pas besoin d'icône pour le PC user
+• Pas besoin de maintenir
+• Pas de timeout automatique de 5 secondes après avoir terminé sans discours
+
+👉 FN = "je veux parler maintenant"
+
+────────────────────────────────────────────────────────────────────────────────
+2️⃣ DIALOGUE DE CHOIX IMMÉDIAT (avant de parler)
+────────────────────────────────────────────────────────────────────────────────
+
+Dès que FN est pressé, une petite UI flottante apparaît.
+
+Exemple :
+┌─────────────────────────────────────┐
+│  🎤 Que veux-tu créer ?             │
+│                                     │
+│  [1] Todo                           │
+│  [2] Note                           │
+│  [3] Document                       │
+│  [4] Planning                       │
+│  [ ] Autre (optionnel plus tard)    │
+│                                     │
+│           [OK / Start]              │
+└─────────────────────────────────────┘
+
+• Sélection rapide (clic / touches fléchées / chiffres 1-2-3-4)
+• Une fois sélectionné → bouton OK / Start
+
+👉 À ce moment-là, l'intention est VERROUILLÉE
+
+Donc :
+• ❌ Pas de versions après
+• ❌ Pas de dialogue aperçu
+• ❌ Pas de confusion
+
+────────────────────────────────────────────────────────────────────────────────
+3️⃣ DÉMARRAGE DE L'ENREGISTREMENT VOCAL
+────────────────────────────────────────────────────────────────────────────────
+
+Une fois "OK" :
+• Le vocal commence automatiquement
+• Pas besoin de re-cliquer FN
+• Pas de détection de silence automatique
+
+UI pendant l'écoute 🎧 :
+┌─────────────────────────────────────────────────┐
+│  ████████████████████████████████████           │
+│  ▓▓▓▓ Animation ondes / cercle pulsant ▓▓▓▓    │
+│                                                 │
+│  🎤 Listening...                    🔴 [Stop]   │
+└─────────────────────────────────────────────────┘
+
+• Petite fenêtre élégante
+• Animation fluide (ondes, cercle pulsant)
+• 🎤 Indicateur clair "Listening…"
+• 🔴 Petit point rouge cliquable = Stop
+
+👉 L'utilisateur garde le contrôle total
+
+────────────────────────────────────────────────────────────────────────────────
+4️⃣ FIN DE L'ENREGISTREMENT
+────────────────────────────────────────────────────────────────────────────────
+
+Quand l'utilisateur clique sur le point rouge :
+
+Le système :
+1. Transcrit la voix
+2. Analyse selon le type choisi :
+   • Todo → tâches claires, structurées
+   • Note → texte nettoyé, logique
+   • Document → reformulation, style, grammaire
+   • Planning → tâches avec dates et priorités
+3. Corrige la langue
+4. Nettoie les phrases
+5. Produit un SEUL résultat final
+
+👉 Pas de versions multiples
+👉 Pas d'aperçu inutile
+👉 Résultat direct, propre, prêt à l'emploi
+
+================================================================================
+🧩 RÉSUMÉ ULTRA-SIMPLE DU FLOW
+================================================================================
+
+                    FN (touche clavier)
+                           ↓
+              ┌────────────────────────┐
+              │   Choix d'intention    │
+              │  Todo/Note/Doc/Planning│
+              └────────────────────────┘
+                           ↓
+                          OK
+                           ↓
+              ┌────────────────────────┐
+              │   Parler librement     │
+              │   (pas de timeout)     │
+              └────────────────────────┘
+                           ↓
+                    🔴 Stop (clic)
+                           ↓
+              ┌────────────────────────┐
+              │  Résultat final propre │
+              │  (inséré directement)  │
+              └────────────────────────┘
+
+================================================================================
+📱 DIFFÉRENCES DESKTOP vs iPad
+================================================================================
+
+DESKTOP (PC/Mac) :
+• Déclenchement : Touche FN du clavier
+• Pas d'icône micro visible
+• Expérience clavier-first
+
+iPad / MOBILE :
+• Déclenchement : Icône micro UI
+• UI flottante tactile
+• Expérience touch-first
+
+================================================================================
+🎨 COMPOSANT UI RÉFÉRENCE
+================================================================================
+
+Le fichier Nouveau-idee-.txt contient un composant React de référence :
+• VoiceAssistantOverlay - Overlay avec états (listening, thinking, result)
+• AudioWaveform - Animation ondes audio
+• ThinkingDots - Animation de traitement
+• Utilise framer-motion pour les animations
+• Design glassmorphism (backdrop-blur, gradients)
+
+À adapter selon le design system existant de Plane :
+• Utiliser les couleurs custom-* du projet
+• Intégrer avec les composants @plane/ui existants
+• Respecter les patterns TypeScript du projet
+
+================================================================================
+📋 FICHIERS À CRÉER/MODIFIER
+================================================================================
+
+NOUVEAUX FICHIERS :
+• packages/ui/src/speech/voice-intent-selector.tsx
+• packages/ui/src/speech/voice-recording-overlay.tsx
+• packages/hooks/src/use-voice-assistant.tsx
+
+FICHIERS À MODIFIER :
+• packages/hooks/src/use-speech-to-text.tsx (désactiver silence auto)
+• apps/web/core/components/editor/* (intégrer FN key listener)
+• packages/ui/src/speech/index.ts (exports)
+
+================================================================================
