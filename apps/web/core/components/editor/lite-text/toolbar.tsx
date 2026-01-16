@@ -71,10 +71,41 @@ export function IssueCommentToolbar(props: Props) {
   const [uiState, setUiState] = useState<"menu" | "listening" | "processing" | "result">("menu");
 
   const handleContentReady = useCallback(
-    (content: string, _intent: TIntentType) => {
-      if (editorRef && content) {
+    (content: string, intent: TIntentType) => {
+      if (!editorRef || !content) return;
+      
+      console.log("[LiteTextToolbar] Inserting content:", { content, intent });
+      
+      if (intent === "todo" || intent === "planning") {
+        const lines = content.split('\n').filter(l => l.trim());
+        const taskItems: string[] = [];
+        
+        for (const line of lines) {
+          if (line.match(/^-\s*\[[ x]\]/)) {
+            const text = line.replace(/^-\s*\[[ x]\]\s*/, '').trim();
+            if (text) {
+              taskItems.push(`<li data-type="taskItem" data-checked="false"><p>${text}</p></li>`);
+            }
+          }
+        }
+        
+        if (taskItems.length > 0) {
+          const html = `<ul data-type="taskList">${taskItems.join('')}</ul>`;
+          editorRef.insertContentAtCursor(html);
+        } else {
+          editorRef.insertTextAtCursor(content + " ");
+        }
+      } else if (intent === "long_text") {
+        const htmlContent = content
+          .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+          .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+          .replace(/\n\n/g, '</p><p>')
+          .replace(/\n/g, '<br/>');
+        editorRef.insertContentAtCursor(`<p>${htmlContent}</p>`);
+      } else {
         editorRef.insertTextAtCursor(content + " ");
       }
+      
       setUiState("result");
       setTimeout(() => {
         setShowVoiceOverlay(false);
