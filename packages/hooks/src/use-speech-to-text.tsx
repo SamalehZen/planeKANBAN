@@ -10,6 +10,7 @@ interface UseSpeechToTextOptions {
   onRecordingTime?: (seconds: number) => void;
   microphoneSensitivity?: number;
   onRecordingStateChange?: (isRecording: boolean) => void;
+  disableSilenceDetection?: boolean;
 }
 
 interface UseSpeechToTextReturn {
@@ -42,7 +43,8 @@ export const useSpeechToText = (options: UseSpeechToTextOptions): UseSpeechToTex
     onVolumeChange, 
     onRecordingTime,
     microphoneSensitivity,
-    onRecordingStateChange
+    onRecordingStateChange,
+    disableSilenceDetection = false,
   } = options;
 
   const [isRecording, setIsRecording] = useState(false);
@@ -243,13 +245,15 @@ export const useSpeechToText = (options: UseSpeechToTextOptions): UseSpeechToTex
           setCurrentVolume(volume);
           onVolumeChange?.(volume);
 
-          if (volume > SILENCE_VOLUME_THRESHOLD) {
-            if (silenceTimerRef.current) {
-              clearTimeout(silenceTimerRef.current);
-              silenceTimerRef.current = null;
+          if (!disableSilenceDetection) {
+            if (volume > SILENCE_VOLUME_THRESHOLD) {
+              if (silenceTimerRef.current) {
+                clearTimeout(silenceTimerRef.current);
+                silenceTimerRef.current = null;
+              }
+            } else if (!silenceTimerRef.current) {
+              silenceTimerRef.current = setTimeout(finishRecordingAndProcess, silenceThreshold);
             }
-          } else if (!silenceTimerRef.current) {
-            silenceTimerRef.current = setTimeout(finishRecordingAndProcess, silenceThreshold);
           }
 
           const amplifiedData = new Float32Array(inputData.length);
@@ -297,7 +301,7 @@ export const useSpeechToText = (options: UseSpeechToTextOptions): UseSpeechToTex
       const err = error instanceof Error ? error : new Error("Failed to start recording");
       onError?.(err);
     }
-  }, [workspaceSlug, isRecording, isConnecting, onTranscript, onError, cleanup, calculateVolume, onVolumeChange, silenceThreshold, finishRecordingAndProcess, microphoneSensitivity, onRecordingStateChange]);
+  }, [workspaceSlug, isRecording, isConnecting, onTranscript, onError, cleanup, calculateVolume, onVolumeChange, silenceThreshold, finishRecordingAndProcess, microphoneSensitivity, onRecordingStateChange, disableSilenceDetection]);
 
   const stopRecording = useCallback(() => {
     console.log("[Speech] Stop recording requested");
