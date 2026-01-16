@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/SamalehZen/planeKANBAN/main/apps/web/public/plane-logos/blue-without-text.png" alt="HyperPLANE Logo" width="100">
+  <img src="[https://raw.githubusercontent.com/SamalehZen/planeKANBAN/main/apps/web/public/plane-logos/blue-without-text.png" alt](https://media.docs.plane.so/logo/plane_github_readme.png)="HyperPLANE Logo" width="100">
 </p>
 
 <h1 align="center">HyperPLANE</h1>
