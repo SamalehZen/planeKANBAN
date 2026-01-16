@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { observer } from "mobx-react";
-// plane imports
 import { LIVE_BASE_PATH, LIVE_BASE_URL } from "@plane/constants";
 import { CollaborativeDocumentEditorWithRef } from "@plane/editor";
 import type {
@@ -15,22 +14,20 @@ import type {
   TServerHandler,
 } from "@plane/editor";
 import { AI_EDITOR_TASKS } from "@plane/constants";
-import { useSmartSpeechToText } from "@plane/hooks";
+import { useIntentFirstSpeech } from "@plane/hooks";
 import type { TIntentType } from "@plane/services";
 import { useTranslation } from "@plane/i18n";
 import type { TSearchEntityRequestPayload, TSearchResponse, TWebhookConnectionQueryParams } from "@plane/types";
-import { ERowVariant, Row, RecordingIndicator, IntentConfirmationModal } from "@plane/ui";
+import { ERowVariant, Row } from "@plane/ui";
 import { cn, generateRandomColor, hslToHex } from "@plane/utils";
-// components
 import { EditorMentionsRoot } from "@/components/editor/embeds/mentions";
-// hooks
+import { VoiceAssistantOverlay } from "@/components/speech";
 import { useEditorMention } from "@/hooks/editor";
 import { useMember } from "@/hooks/store/use-member";
 import { useWorkspace } from "@/hooks/store/use-workspace";
 import { useUser } from "@/hooks/store/user";
 import { usePageFilters } from "@/hooks/use-page-filters";
 import { useParseEditorContent } from "@/hooks/use-parse-editor-content";
-// plane web imports
 import type { TCustomEventHandlers } from "@/hooks/use-realtime-page-events";
 import { useRealtimePageEvents } from "@/hooks/use-realtime-page-events";
 import { EditorAIMenu } from "@/plane-web/components/pages";
@@ -38,13 +35,10 @@ import { AIService } from "@/services/ai.service";
 import type { TExtendedEditorExtensionsConfig } from "@/plane-web/hooks/pages";
 import type { EPageStoreType } from "@/plane-web/hooks/store";
 import { useEditorFlagging } from "@/plane-web/hooks/use-editor-flagging";
-// store
 import type { TPageInstance } from "@/store/pages/base-page";
-// local imports
 import { PageContentLoader } from "../loaders/page-content-loader";
 import { PageEditorHeaderRoot } from "./header";
 import { PageContentBrowser } from "./summary";
-import { PageEditorTitle } from "./title";
 
 export type TEditorBodyConfig = {
   fileHandler: TFileHandler;
@@ -91,13 +85,12 @@ export const PageEditorBody = observer(function PageEditorBody(props: Props) {
     isFetchingFallbackBinary,
     onCollaborationStateChange,
   } = props;
-  // refs
+
   const titleEditorRef = useRef<EditorTitleRefApi>(null);
-  // store hooks
   const { data: currentUser } = useUser();
   const { getWorkspaceBySlug } = useWorkspace();
   const { getUserDetails } = useMember();
-  // derived values
+
   const {
     id: pageId,
     isContentEditable,
@@ -105,27 +98,26 @@ export const PageEditorBody = observer(function PageEditorBody(props: Props) {
     setSyncingStatus,
   } = page;
   const workspaceId = getWorkspaceBySlug(workspaceSlug)?.id ?? "";
-  // use editor mention
+
   const { fetchMentions } = useEditorMention({
     enableAdvancedMentions: true,
     searchEntity: handlers.fetchEntity,
   });
-  // editor flaggings
+
   const { document: documentEditorExtensions } = useEditorFlagging({
     workspaceSlug,
     projectId,
     storeType,
   });
-  // parse content
+
   const { getEditorMetaData } = useParseEditorContent({
     projectId,
     workspaceSlug,
   });
-  // page filters
+
   const { fontSize, fontStyle, isFullWidth } = usePageFilters();
-  // translation
   const { t } = useTranslation();
-  // derived values
+
   const displayConfig: TDisplayConfig = useMemo(
     () => ({
       fontSize,
@@ -135,7 +127,6 @@ export const PageEditorBody = observer(function PageEditorBody(props: Props) {
     [fontSize, fontStyle, isFullWidth]
   );
 
-  // Use the new hook to handle page events
   const { updatePageProperties } = useRealtimePageEvents({
     storeType,
     page,
@@ -143,7 +134,6 @@ export const PageEditorBody = observer(function PageEditorBody(props: Props) {
     handlers,
   });
 
-  // Set syncing status when page changes and reset collaboration state
   useEffect(() => {
     setSyncingStatus("syncing");
     onCollaborationStateChange?.({
@@ -153,8 +143,10 @@ export const PageEditorBody = observer(function PageEditorBody(props: Props) {
     });
   }, [pageId, setSyncingStatus, onCollaborationStateChange]);
 
-  // Smart Speech-to-text integration
-  const insertContent = useCallback((intent: TIntentType, content: string) => {
+  const [showVoiceOverlay, setShowVoiceOverlay] = useState(false);
+  const [uiState, setUiState] = useState<"menu" | "listening" | "processing" | "result">("menu");
+
+  const insertContent = useCallback((content: string, intent: TIntentType) => {
     const editor = editorForwardRef?.current || editorRef?.current;
     if (!editor || !content) return;
     
@@ -175,32 +167,58 @@ export const PageEditorBody = observer(function PageEditorBody(props: Props) {
     } else {
       editor.insertTextAtCursor(content + " ");
     }
+
+    setUiState("result");
+    setTimeout(() => {
+      setShowVoiceOverlay(false);
+      setUiState("menu");
+    }, 1500);
   }, [editorForwardRef, editorRef]);
 
-  const {
-    isRecording,
-    isProcessing,
-    startRecording,
-    stopRecording,
-    recordingDuration,
-    currentVolume,
-    smartResult,
-    showIntentModal,
-    selectIntent,
-    closeModal,
-  } = useSmartSpeechToText({
+  const speech = useIntentFirstSpeech({
     workspaceSlug: workspaceSlug || "",
-    onIntentSelect: insertContent,
-    silenceThreshold: 5000,
+    onResult: insertContent,
   });
+
+  useEffect(() => {
+    if (speech.isRecording) {
+      setUiState("listening");
+    } else if (speech.isProcessing) {
+      setUiState("processing");
+    }
+  }, [speech.isRecording, speech.isProcessing]);
+
+  const handleIntentSelect = useCallback(
+    async (intent: TIntentType) => {
+      setUiState("listening");
+      await speech.startWithIntent(intent);
+    },
+    [speech]
+  );
+
+  const handleStop = useCallback(() => {
+    speech.stopAndProcess();
+    setUiState("processing");
+  }, [speech]);
+
+  const handleClose = useCallback(() => {
+    setShowVoiceOverlay(false);
+    setUiState("menu");
+    speech.closeIntentPicker();
+  }, [speech]);
 
   const speechHandler = useMemo(
     () => ({
-      onStart: () => startRecording(),
-      onStop: () => stopRecording(),
-      isRecording: () => isRecording,
+      onStart: () => {
+        setShowVoiceOverlay(true);
+        setUiState("menu");
+      },
+      onStop: () => {
+        handleStop();
+      },
+      isRecording: () => speech.isRecording,
     }),
-    [startRecording, stopRecording, isRecording]
+    [speech.isRecording, handleStop]
   );
 
   const getAIMenu = useCallback(
@@ -260,17 +278,13 @@ export const PageEditorBody = observer(function PageEditorBody(props: Props) {
   const serverHandler: TServerHandler = useMemo(
     () => ({
       onStateChange: (state) => {
-        // Pass full state to parent
         onCollaborationStateChange?.(state);
 
-        // Map collaboration stage to UI syncing status
-        // Stage → UI mapping: disconnected → error | synced → synced | all others → syncing
         if (state.stage.kind === "disconnected") {
           setSyncingStatus("error");
         } else if (state.stage.kind === "synced") {
           setSyncingStatus("synced");
         } else {
-          // initial, connecting, awaiting-sync, reconnecting → show as syncing
           setSyncingStatus("syncing");
         }
       },
@@ -279,7 +293,6 @@ export const PageEditorBody = observer(function PageEditorBody(props: Props) {
   );
 
   const realtimeConfig: TRealtimeConfig | undefined = useMemo(() => {
-    // Construct the WebSocket Collaboration URL
     try {
       const LIVE_SERVER_BASE_URL = LIVE_BASE_URL?.trim() || window.location.origin;
       const WS_LIVE_URL = new URL(LIVE_SERVER_BASE_URL);
@@ -287,14 +300,12 @@ export const PageEditorBody = observer(function PageEditorBody(props: Props) {
       WS_LIVE_URL.protocol = isSecureEnvironment ? "wss" : "ws";
       WS_LIVE_URL.pathname = `${LIVE_BASE_PATH}/collaboration`;
 
-      // Append query parameters to the URL
       Object.entries(webhookConnectionParams)
         .filter(([_, value]) => value !== undefined && value !== null)
         .forEach(([key, value]) => {
           WS_LIVE_URL.searchParams.set(key, String(value));
         });
 
-      // Construct realtime config
       return {
         url: WS_LIVE_URL.toString(),
       };
@@ -325,94 +336,86 @@ export const PageEditorBody = observer(function PageEditorBody(props: Props) {
   if (isPageLoading) return <PageContentLoader className={blockWidthClassName} />;
 
   return (
-    <Row
-      className="relative size-full flex flex-col overflow-y-auto overflow-x-hidden vertical-scrollbar scrollbar-md duration-200"
-      variant={ERowVariant.HUGGING}
-    >
-      <div id="page-content-container" className="relative w-full flex-shrink-0">
-        {/* table of content */}
-        {!isNavigationPaneOpen && (
-          <div className="page-summary-container absolute h-full right-0 top-[64px] z-[5]">
-            <div className="sticky top-[72px]">
-              <div className="group/page-toc relative px-page-x">
-                <div
-                  className="!cursor-pointer max-h-[50vh] overflow-hidden"
-                  role="button"
-                  aria-label={t("page_navigation_pane.outline_floating_button")}
-                  onClick={handleOpenNavigationPane}
-                >
-                  <PageContentBrowser className="overflow-y-auto" editorRef={editorRef} showOutline />
-                </div>
-                <div className="absolute top-0 right-0 opacity-0 translate-x-1/2 pointer-events-none group-hover/page-toc:opacity-100 group-hover/page-toc:-translate-x-1/4 group-hover/page-toc:pointer-events-auto transition-all duration-300 w-52 max-h-[70vh] overflow-y-scroll vertical-scrollbar scrollbar-sm whitespace-nowrap bg-surface-2 p-4 rounded-sm">
-                  <PageContentBrowser className="overflow-y-auto" editorRef={editorRef} />
+    <>
+      <Row
+        className="relative size-full flex flex-col overflow-y-auto overflow-x-hidden vertical-scrollbar scrollbar-md duration-200"
+        variant={ERowVariant.HUGGING}
+      >
+        <div id="page-content-container" className="relative w-full flex-shrink-0">
+          {!isNavigationPaneOpen && (
+            <div className="page-summary-container absolute h-full right-0 top-[64px] z-[5]">
+              <div className="sticky top-[72px]">
+                <div className="group/page-toc relative px-page-x">
+                  <div
+                    className="!cursor-pointer max-h-[50vh] overflow-hidden"
+                    role="button"
+                    aria-label={t("page_navigation_pane.outline_floating_button")}
+                    onClick={handleOpenNavigationPane}
+                  >
+                    <PageContentBrowser className="overflow-y-auto" editorRef={editorRef} showOutline />
+                  </div>
+                  <div className="absolute top-0 right-0 opacity-0 translate-x-1/2 pointer-events-none group-hover/page-toc:opacity-100 group-hover/page-toc:-translate-x-1/4 group-hover/page-toc:pointer-events-auto transition-all duration-300 w-52 max-h-[70vh] overflow-y-scroll vertical-scrollbar scrollbar-sm whitespace-nowrap bg-surface-2 p-4 rounded-sm">
+                    <PageContentBrowser className="overflow-y-auto" editorRef={editorRef} />
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        )}
-        <div>
-          <div className="page-header-container group/page-header">
-            <div className={blockWidthClassName}>
-              <PageEditorHeaderRoot page={page} projectId={projectId} />
+          )}
+          <div>
+            <div className="page-header-container group/page-header">
+              <div className={blockWidthClassName}>
+                <PageEditorHeaderRoot page={page} projectId={projectId} />
+              </div>
             </div>
+            <CollaborativeDocumentEditorWithRef
+              editable={isContentEditable}
+              id={pageId}
+              fileHandler={config.fileHandler}
+              handleEditorReady={handleEditorReady}
+              ref={editorForwardRef}
+              titleRef={titleEditorRef}
+              containerClassName="h-full p-0 pb-64"
+              displayConfig={displayConfig}
+              getEditorMetaData={getEditorMetaData}
+              mentionHandler={{
+                searchCallback: async (query) => {
+                  const res = await fetchMentions(query);
+                  if (!res) throw new Error("Failed in fetching mentions");
+                  return res;
+                },
+                renderComponent: (props) => <EditorMentionsRoot {...props} />,
+                getMentionedEntityDetails: (id: string) => ({ display_name: getUserDetails(id)?.display_name ?? "" }),
+              }}
+              updatePageProperties={updatePageProperties}
+              realtimeConfig={realtimeConfig}
+              serverHandler={serverHandler}
+              user={userConfig}
+              disabledExtensions={documentEditorExtensions.disabled}
+              flaggedExtensions={documentEditorExtensions.flagged}
+              aiHandler={{
+                menu: getAIMenu,
+                onSelectionAction: handleAISelectionAction,
+              }}
+              speechHandler={isContentEditable ? speechHandler : undefined}
+              onAssetChange={updateAssetsList}
+              extendedEditorProps={extendedEditorProps}
+              isFetchingFallbackBinary={isFetchingFallbackBinary}
+            />
           </div>
-          <CollaborativeDocumentEditorWithRef
-            editable={isContentEditable}
-            id={pageId}
-            fileHandler={config.fileHandler}
-            handleEditorReady={handleEditorReady}
-            ref={editorForwardRef}
-            titleRef={titleEditorRef}
-            containerClassName="h-full p-0 pb-64"
-            displayConfig={displayConfig}
-            getEditorMetaData={getEditorMetaData}
-            mentionHandler={{
-              searchCallback: async (query) => {
-                const res = await fetchMentions(query);
-                if (!res) throw new Error("Failed in fetching mentions");
-                return res;
-              },
-              renderComponent: (props) => <EditorMentionsRoot {...props} />,
-              getMentionedEntityDetails: (id: string) => ({ display_name: getUserDetails(id)?.display_name ?? "" }),
-            }}
-            updatePageProperties={updatePageProperties}
-            realtimeConfig={realtimeConfig}
-            serverHandler={serverHandler}
-            user={userConfig}
-            disabledExtensions={documentEditorExtensions.disabled}
-            flaggedExtensions={documentEditorExtensions.flagged}
-            aiHandler={{
-              menu: getAIMenu,
-              onSelectionAction: handleAISelectionAction,
-            }}
-            speechHandler={isContentEditable ? speechHandler : undefined}
-            onAssetChange={updateAssetsList}
-            extendedEditorProps={extendedEditorProps}
-            isFetchingFallbackBinary={isFetchingFallbackBinary}
-          />
         </div>
-      </div>
+      </Row>
 
-      <RecordingIndicator
-        isRecording={isRecording}
-        volume={currentVolume}
-        duration={recordingDuration}
-        className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50"
-      />
-
-      <IntentConfirmationModal
-        isOpen={showIntentModal}
-        onClose={closeModal}
-        onConfirm={selectIntent}
-        primaryIntent={smartResult?.intent || "note"}
-        secondaryIntent={smartResult?.secondary_intent}
-        preview={smartResult?.formatted_content || ""}
-        originalTranscript={smartResult?.original_transcript}
-        formattedTodo={smartResult?.formatted_todo}
-        formattedNote={smartResult?.formatted_note}
-        formattedPlanning={smartResult?.formatted_planning}
-        formattedLongText={smartResult?.formatted_long_text}
-      />
-    </Row>
+      {showVoiceOverlay && (
+        <VoiceAssistantOverlay
+          state={uiState}
+          intent={speech.selectedIntent}
+          duration={speech.recordingDuration}
+          volume={speech.currentVolume}
+          onSelectIntent={handleIntentSelect}
+          onStop={handleStop}
+          onClose={handleClose}
+        />
+      )}
+    </>
   );
 });
