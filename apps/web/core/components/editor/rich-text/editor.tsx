@@ -46,6 +46,49 @@ type RichTextEditorWrapperProps = MakeOptional<
       }
   );
 
+const convertMarkdownToHtml = (content: string, intent: IntentType): string => {
+  let html = content;
+  
+  html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+  html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+  if (intent === "todo" || intent === "planning") {
+    const lines = html.split('\n');
+    const taskItems: string[] = [];
+    const otherContent: string[] = [];
+    
+    lines.forEach(line => {
+      const taskMatch = line.match(/^-\s*\[[ x]\]\s*(.*)$/);
+      if (taskMatch) {
+        const isChecked = line.includes('[x]');
+        taskItems.push(`<li data-type="taskItem" data-checked="${isChecked}"><p>${taskMatch[1]}</p></li>`);
+      } else if (line.trim()) {
+        otherContent.push(line);
+      }
+    });
+
+    if (taskItems.length > 0) {
+      html = `<ul data-type="taskList">${taskItems.join('')}</ul>`;
+      if (otherContent.length > 0) {
+        html = otherContent.map(l => `<p>${l}</p>`).join('') + html;
+      }
+    }
+  } else {
+    const paragraphs = html.split('\n\n');
+    html = paragraphs
+      .map(p => {
+        if (p.startsWith('<h2>') || p.startsWith('<h3>')) return p;
+        const lines = p.split('\n').filter(l => l.trim());
+        return lines.map(l => `<p>${l}</p>`).join('');
+      })
+      .join('');
+  }
+
+  return html;
+};
+
 export const RichTextEditor = forwardRef(function RichTextEditor(
   props: RichTextEditorWrapperProps,
   ref: React.ForwardedRef<EditorRefApi>
@@ -89,32 +132,12 @@ export const RichTextEditor = forwardRef(function RichTextEditor(
       const editor = editorRefInternal.current;
       if (!editor) return;
 
-      switch (intent) {
-        case "todo":
-        case "planning": {
-          const lines = content.split("\n").filter(l => l.trim());
-          const formattedContent = lines
-            .map(line => {
-              const taskMatch = line.match(/^-\s*\[[ x]\]\s*(.*)$/);
-              if (taskMatch) {
-                return `<li data-type="taskItem" data-checked="false"><p>${taskMatch[1]}</p></li>`;
-              }
-              return `<p>${line}</p>`;
-            })
-            .join("");
-          
-          if (lines.some(l => l.match(/^-\s*\[[ x]\]/))) {
-            editor.insertContentAtCursor(`<ul data-type="taskList">${formattedContent}</ul>`);
-          } else {
-            editor.insertContentAtCursor(content);
-          }
-          break;
-        }
-        case "note":
-        case "long_text":
-        default:
-          editor.insertContentAtCursor(content);
-          break;
+      try {
+        const htmlContent = convertMarkdownToHtml(content, intent);
+        editor.insertContentAtCursor(htmlContent);
+      } catch (error) {
+        console.error("[Speech] Error inserting structured content:", error);
+        editor.insertTextAtCursor(content + " ");
       }
     },
     []
@@ -163,12 +186,7 @@ export const RichTextEditor = forwardRef(function RichTextEditor(
         });
         
         setSmartResult(result);
-        
-        if (result.secondary_intent) {
-          setShowIntentModal(true);
-        } else {
-          insertStructuredContent(result.intent, result.formatted_content);
-        }
+        setShowIntentModal(true);
       } catch (error) {
         console.error("Smart transcript failed:", error);
         editor.insertTextAtCursor(text + " ");
@@ -177,7 +195,7 @@ export const RichTextEditor = forwardRef(function RichTextEditor(
         streamingTextRef.current = "";
       }
     },
-    [workspaceSlug, currentNodeInfo, insertStructuredContent]
+    [workspaceSlug, currentNodeInfo]
   );
 
   const handleIntentConfirm = useCallback(
@@ -191,12 +209,18 @@ export const RichTextEditor = forwardRef(function RichTextEditor(
     [smartResult, insertStructuredContent]
   );
 
+  const handleModalClose = useCallback(() => {
+    setShowIntentModal(false);
+    if (smartResult) {
+      editorRefInternal.current?.insertTextAtCursor(smartResult.original_transcript + " ");
+    }
+    setSmartResult(null);
+  }, [smartResult]);
+
   const {
     isRecording,
     startRecording,
     stopRecording,
-    recordingDuration: hookDuration,
-    currentVolume: hookVolume,
   } = useSpeechToText({
     workspaceSlug: workspaceSlug || "",
     onTranscript: handleSpeechTranscript,
@@ -331,17 +355,12 @@ export const RichTextEditor = forwardRef(function RichTextEditor(
 
       <IntentConfirmationModal
         isOpen={showIntentModal}
-        onClose={() => {
-          setShowIntentModal(false);
-          if (smartResult) {
-            editorRefInternal.current?.insertTextAtCursor(smartResult.original_transcript + " ");
-          }
-          setSmartResult(null);
-        }}
+        onClose={handleModalClose}
         onConfirm={handleIntentConfirm}
         primaryIntent={smartResult?.intent || "note"}
         secondaryIntent={smartResult?.secondary_intent}
         preview={smartResult?.formatted_content || ""}
+        originalTranscript={smartResult?.original_transcript}
       />
     </>
   );
