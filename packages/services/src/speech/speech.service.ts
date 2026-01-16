@@ -5,16 +5,23 @@ export interface ISpeechTokenResponse {
   token: string;
 }
 
+export type TIntentType = "todo" | "note" | "planning" | "long_text";
+
 export interface ISmartTranscriptRequest {
   transcript: string;
   language: "fr";
+  intent?: TIntentType;
 }
 
 export interface ISmartTranscriptResponse {
-  intent: "todo" | "note" | "planning" | "long_text";
+  intent: TIntentType;
   confidence: number;
-  secondary_intent?: "todo" | "note" | "planning" | "long_text";
+  secondary_intent?: TIntentType;
   formatted_content: string;
+  formatted_todo?: string;
+  formatted_note?: string;
+  formatted_planning?: string;
+  formatted_long_text?: string;
   original_transcript: string;
   corrections?: string[];
 }

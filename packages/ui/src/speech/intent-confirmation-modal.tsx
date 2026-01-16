@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { 
   ListTodo, 
   FileText, 
@@ -7,8 +7,7 @@ import {
   Check, 
   X, 
   Sparkles,
-  Mic,
-  ChevronRight
+  Mic
 } from "lucide-react";
 import { cn } from "../utils";
 
@@ -22,6 +21,10 @@ interface IntentConfirmationModalProps {
   secondaryIntent?: IntentType;
   preview: string;
   originalTranscript?: string;
+  formattedTodo?: string;
+  formattedNote?: string;
+  formattedPlanning?: string;
+  formattedLongText?: string;
 }
 
 const INTENT_CONFIG: Record<IntentType, { 
@@ -35,7 +38,7 @@ const INTENT_CONFIG: Record<IntentType, {
   todo: {
     icon: ListTodo,
     label: "Liste de tâches",
-    description: "Créer une checklist avec des cases à cocher",
+    description: "Checklist avec cases à cocher",
     color: "text-green-600",
     bgColor: "bg-green-50",
     borderColor: "border-green-200",
@@ -43,7 +46,7 @@ const INTENT_CONFIG: Record<IntentType, {
   note: {
     icon: FileText,
     label: "Note simple",
-    description: "Texte structuré et formaté",
+    description: "Texte structuré simple",
     color: "text-blue-600",
     bgColor: "bg-blue-50",
     borderColor: "border-blue-200",
@@ -59,7 +62,7 @@ const INTENT_CONFIG: Record<IntentType, {
   long_text: {
     icon: AlignLeft,
     label: "Document",
-    description: "Texte long avec titres et sections",
+    description: "Texte long avec titres",
     color: "text-orange-600",
     bgColor: "bg-orange-50",
     borderColor: "border-orange-200",
@@ -74,6 +77,10 @@ export const IntentConfirmationModal: React.FC<IntentConfirmationModalProps> = (
   secondaryIntent,
   preview,
   originalTranscript,
+  formattedTodo,
+  formattedNote,
+  formattedPlanning,
+  formattedLongText,
 }) => {
   const [selectedIntent, setSelectedIntent] = useState<IntentType>(primaryIntent);
   const [isAnimating, setIsAnimating] = useState(false);
@@ -87,12 +94,24 @@ export const IntentConfirmationModal: React.FC<IntentConfirmationModalProps> = (
     }
   }, [isOpen, primaryIntent]);
 
+  const currentPreview = useMemo(() => {
+    switch (selectedIntent) {
+      case "todo":
+        return formattedTodo || preview;
+      case "note":
+        return formattedNote || preview;
+      case "planning":
+        return formattedPlanning || preview;
+      case "long_text":
+        return formattedLongText || preview;
+      default:
+        return preview;
+    }
+  }, [selectedIntent, preview, formattedTodo, formattedNote, formattedPlanning, formattedLongText]);
+
   if (!isOpen) return null;
 
-  const intentsToShow = secondaryIntent 
-    ? [primaryIntent, secondaryIntent] 
-    : Object.keys(INTENT_CONFIG) as IntentType[];
-
+  const allIntents: IntentType[] = ["todo", "note", "planning", "long_text"];
   const selectedConfig = INTENT_CONFIG[selectedIntent];
 
   return (
@@ -117,18 +136,15 @@ export const IntentConfirmationModal: React.FC<IntentConfirmationModalProps> = (
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-custom-text-100">
-                    Analyse vocale terminée
+                    Choisissez le format
                   </h3>
                   <p className="text-sm text-custom-text-300 mt-0.5">
-                    Choisissez le format qui correspond le mieux
+                    L'aperçu change selon votre choix
                   </p>
                 </div>
               </div>
-              <button 
-                onClick={onClose} 
-                className="p-2 rounded-lg hover:bg-custom-background-80 transition-colors group"
-              >
-                <X className="w-5 h-5 text-custom-text-400 group-hover:text-custom-text-200" />
+              <button onClick={onClose} className="p-2 rounded-lg hover:bg-custom-background-80 transition-colors">
+                <X className="w-5 h-5 text-custom-text-400" />
               </button>
             </div>
           </div>
@@ -136,25 +152,20 @@ export const IntentConfirmationModal: React.FC<IntentConfirmationModalProps> = (
 
         <div className="px-6 py-4">
           {originalTranscript && (
-            <div className="mb-5 p-3 rounded-lg bg-custom-background-90 border border-custom-border-200">
+            <div className="mb-4 p-3 rounded-lg bg-custom-background-90 border border-custom-border-200">
               <div className="flex items-center gap-2 mb-2">
                 <Mic className="w-3.5 h-3.5 text-custom-text-400" />
                 <span className="text-xs font-medium text-custom-text-400 uppercase tracking-wide">
-                  Transcription originale
+                  Transcription
                 </span>
               </div>
-              <p className="text-sm text-custom-text-200 leading-relaxed">
-                "{originalTranscript}"
-              </p>
+              <p className="text-sm text-custom-text-200">"{originalTranscript}"</p>
             </div>
           )}
 
-          <div className="mb-5">
-            <label className="block text-sm font-medium text-custom-text-200 mb-3">
-              Format de sortie
-            </label>
-            <div className="grid grid-cols-2 gap-3">
-              {intentsToShow.map((intent) => {
+          <div className="mb-4">
+            <div className="grid grid-cols-4 gap-2">
+              {allIntents.map((intent) => {
                 const config = INTENT_CONFIG[intent];
                 const Icon = config.icon;
                 const isSelected = selectedIntent === intent;
@@ -165,42 +176,23 @@ export const IntentConfirmationModal: React.FC<IntentConfirmationModalProps> = (
                     key={intent}
                     onClick={() => setSelectedIntent(intent)}
                     className={cn(
-                      "relative flex items-start gap-3 p-4 rounded-xl border-2 transition-all duration-200 text-left group",
+                      "relative flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all duration-200",
                       isSelected 
                         ? `${config.borderColor} ${config.bgColor}` 
-                        : "border-custom-border-200 hover:border-custom-border-300 hover:bg-custom-background-90"
+                        : "border-custom-border-200 hover:border-custom-border-300"
                     )}
                   >
                     {isPrimary && (
-                      <span className="absolute -top-2 -right-2 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-custom-primary-100 text-white rounded-full shadow-sm">
-                        Suggéré
-                      </span>
+                      <span className="absolute -top-1.5 -right-1.5 w-3 h-3 bg-custom-primary-100 rounded-full" />
                     )}
-                    <div className={cn(
-                      "flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center transition-colors",
-                      isSelected ? config.bgColor : "bg-custom-background-80 group-hover:bg-custom-background-90"
+                    <Icon className={cn("w-5 h-5", isSelected ? config.color : "text-custom-text-300")} />
+                    <span className={cn(
+                      "text-xs font-medium text-center",
+                      isSelected ? "text-custom-text-100" : "text-custom-text-300"
                     )}>
-                      <Icon className={cn(
-                        "w-5 h-5 transition-colors",
-                        isSelected ? config.color : "text-custom-text-300"
-                      )} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className={cn(
-                          "font-medium transition-colors",
-                          isSelected ? "text-custom-text-100" : "text-custom-text-200"
-                        )}>
-                          {config.label}
-                        </span>
-                        {isSelected && (
-                          <Check className={cn("w-4 h-4", config.color)} />
-                        )}
-                      </div>
-                      <p className="text-xs text-custom-text-400 mt-0.5 line-clamp-2">
-                        {config.description}
-                      </p>
-                    </div>
+                      {config.label}
+                    </span>
+                    {isSelected && <Check className={cn("w-4 h-4 absolute top-1 right-1", config.color)} />}
                   </button>
                 );
               })}
@@ -219,48 +211,30 @@ export const IntentConfirmationModal: React.FC<IntentConfirmationModalProps> = (
               </span>
             </div>
             <div className="p-4 bg-custom-background-100 max-h-48 overflow-y-auto">
-              <div 
-                className="text-sm text-custom-text-200 prose prose-sm max-w-none
-                  prose-headings:text-custom-text-100 prose-headings:font-semibold
-                  prose-p:text-custom-text-200 prose-p:leading-relaxed
-                  prose-ul:text-custom-text-200 prose-li:text-custom-text-200
-                  prose-strong:text-custom-text-100"
-                dangerouslySetInnerHTML={{ 
-                  __html: preview
-                    .replace(/\n/g, "<br/>")
-                    .replace(/^- \[ \] (.+)$/gm, '<div class="flex items-center gap-2 py-1"><input type="checkbox" disabled class="rounded border-custom-border-300" /><span>$1</span></div>')
-                    .replace(/^## (.+)$/gm, '<h2 class="text-base font-semibold mt-3 mb-2">$1</h2>')
-                    .replace(/^### (.+)$/gm, '<h3 class="text-sm font-medium mt-2 mb-1">$1</h3>')
-                }}
-              />
+              <pre className="text-sm text-custom-text-200 whitespace-pre-wrap font-sans">
+                {currentPreview}
+              </pre>
             </div>
           </div>
         </div>
 
         <div className="px-6 py-4 border-t border-custom-border-200 bg-custom-background-90">
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-custom-text-400">
-              Le contenu sera inséré dans la description
-            </p>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={onClose}
-                className="px-4 py-2.5 text-sm font-medium text-custom-text-200 hover:text-custom-text-100 hover:bg-custom-background-80 rounded-lg transition-colors"
-              >
-                Annuler
-              </button>
-              <button
-                onClick={() => onConfirm(selectedIntent)}
-                className={cn(
-                  "flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white rounded-lg transition-all",
-                  "bg-custom-primary-100 hover:bg-custom-primary-200",
-                  "shadow-sm hover:shadow-md"
-                )}
-              >
-                Insérer
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
+          <div className="flex items-center justify-end gap-3">
+            <button
+              onClick={onClose}
+              className="px-4 py-2.5 text-sm font-medium text-custom-text-200 hover:bg-custom-background-80 rounded-lg"
+            >
+              Annuler
+            </button>
+            <button
+              onClick={() => onConfirm(selectedIntent)}
+              className={cn(
+                "px-5 py-2.5 text-sm font-medium text-white rounded-lg transition-all",
+                "bg-custom-primary-100 hover:bg-custom-primary-200"
+              )}
+            >
+              Insérer
+            </button>
           </div>
         </div>
       </div>

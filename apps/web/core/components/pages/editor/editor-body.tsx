@@ -15,10 +15,11 @@ import type {
   TServerHandler,
 } from "@plane/editor";
 import { AI_EDITOR_TASKS } from "@plane/constants";
-import { useSpeechToText } from "@plane/hooks";
+import { useSmartSpeechToText } from "@plane/hooks";
+import type { TIntentType } from "@plane/services";
 import { useTranslation } from "@plane/i18n";
 import type { TSearchEntityRequestPayload, TSearchResponse, TWebhookConnectionQueryParams } from "@plane/types";
-import { ERowVariant, Row } from "@plane/ui";
+import { ERowVariant, Row, RecordingIndicator, IntentConfirmationModal } from "@plane/ui";
 import { cn, generateRandomColor, hslToHex } from "@plane/utils";
 // components
 import { EditorMentionsRoot } from "@/components/editor/embeds/mentions";
@@ -152,93 +153,54 @@ export const PageEditorBody = observer(function PageEditorBody(props: Props) {
     });
   }, [pageId, setSyncingStatus, onCollaborationStateChange]);
 
-  // Speech-to-text integration
-  const [isRecordingState, setIsRecordingState] = useState(false);
-  const [currentNodeInfo, setCurrentNodeInfo] = useState<{ from: number; to: number } | null>(null);
-  const streamingTextRef = useRef<string>("");
-  const lastInsertedTextRef = useRef<string>("");
-
-  const handleSpeechTranscript = useCallback(
-    (text: string, isFinal: boolean) => {
-      const editor = editorForwardRef?.current || editorRef?.current;
-      if (!editor) {
-        console.error("[Speech] No editor ref available");
-        return;
-      }
+  // Smart Speech-to-text integration
+  const insertContent = useCallback((intent: TIntentType, content: string) => {
+    const editor = editorForwardRef?.current || editorRef?.current;
+    if (!editor || !content) return;
+    
+    if (intent === "todo" || intent === "planning") {
+      const lines = content.split('\n').filter(l => l.trim());
+      const taskItems = lines
+        .filter(l => l.match(/^-\s*\[[ x]\]/))
+        .map(l => {
+          const text = l.replace(/^-\s*\[[ x]\]\s*/, '');
+          return `<li data-type="taskItem" data-checked="false"><p>${text}</p></li>`;
+        });
       
-      if (currentNodeInfo) {
-        if (isFinal) {
-          streamingTextRef.current = "";
-        } else {
-          streamingTextRef.current = text;
-          try {
-            const view = (editor as any).editor?.view;
-            if (view) {
-              const { state, dispatch } = view;
-              const tr = state.tr.replaceWith(
-                currentNodeInfo.from,
-                currentNodeInfo.to,
-                state.schema.text(text || " ")
-              );
-              dispatch(tr);
-              setCurrentNodeInfo({
-                from: currentNodeInfo.from,
-                to: currentNodeInfo.from + (text?.length || 1),
-              });
-            }
-          } catch (e) {
-            console.error("[Speech] Error updating text:", e);
-          }
-        }
+      if (taskItems.length > 0) {
+        editor.insertContentAtCursor(`<ul data-type="taskList">${taskItems.join('')}</ul>`);
       } else {
-        if (isFinal && text) {
-          if (lastInsertedTextRef.current === text) {
-            console.log("[Speech] Skipping duplicate insertion:", text);
-            return;
-          }
-          lastInsertedTextRef.current = text;
-          console.log("[Speech] Inserting final text at cursor:", text);
-          try {
-            editor.insertTextAtCursor(text + " ");
-          } catch (e) {
-            console.error("[Speech] Error inserting text:", e);
-          }
-        }
+        editor.insertTextAtCursor(content + " ");
       }
-    },
-    [editorRef, editorForwardRef, currentNodeInfo]
-  );
+    } else {
+      editor.insertTextAtCursor(content + " ");
+    }
+  }, [editorForwardRef, editorRef]);
 
   const {
     isRecording,
+    isProcessing,
     startRecording,
     stopRecording,
-  } = useSpeechToText({
+    recordingDuration,
+    currentVolume,
+    smartResult,
+    showIntentModal,
+    selectIntent,
+    closeModal,
+  } = useSmartSpeechToText({
     workspaceSlug: workspaceSlug || "",
-    onTranscript: handleSpeechTranscript,
+    onIntentSelect: insertContent,
+    silenceThreshold: 5000,
   });
-
-  useEffect(() => {
-    setIsRecordingState(isRecording);
-  }, [isRecording]);
 
   const speechHandler = useMemo(
     () => ({
-      onStart: (nodeInfo?: { from: number; to: number }) => {
-        setCurrentNodeInfo(nodeInfo || null);
-        streamingTextRef.current = "";
-        lastInsertedTextRef.current = "";
-        startRecording();
-      },
-      onStop: () => {
-        stopRecording();
-        setCurrentNodeInfo(null);
-        streamingTextRef.current = "";
-        lastInsertedTextRef.current = "";
-      },
-      isRecording: () => isRecordingState,
+      onStart: () => startRecording(),
+      onStop: () => stopRecording(),
+      isRecording: () => isRecording,
     }),
-    [startRecording, stopRecording, isRecordingState]
+    [startRecording, stopRecording, isRecording]
   );
 
   const getAIMenu = useCallback(
@@ -430,6 +392,27 @@ export const PageEditorBody = observer(function PageEditorBody(props: Props) {
           />
         </div>
       </div>
+
+      <RecordingIndicator
+        isRecording={isRecording}
+        volume={currentVolume}
+        duration={recordingDuration}
+        className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50"
+      />
+
+      <IntentConfirmationModal
+        isOpen={showIntentModal}
+        onClose={closeModal}
+        onConfirm={selectIntent}
+        primaryIntent={smartResult?.intent || "note"}
+        secondaryIntent={smartResult?.secondary_intent}
+        preview={smartResult?.formatted_content || ""}
+        originalTranscript={smartResult?.original_transcript}
+        formattedTodo={smartResult?.formatted_todo}
+        formattedNote={smartResult?.formatted_note}
+        formattedPlanning={smartResult?.formatted_planning}
+        formattedLongText={smartResult?.formatted_long_text}
+      />
     </Row>
   );
 });
