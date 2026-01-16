@@ -3,7 +3,7 @@ from django.urls import path
 
 from plane.app.views import UnsplashEndpoint
 from plane.app.views import GPTIntegrationEndpoint, WorkspaceGPTIntegrationEndpoint
-from plane.app.views import AssemblyAITokenEndpoint
+from plane.app.views import AssemblyAITokenEndpoint, SmartTranscriptEndpoint
 
 
 urlpatterns = [
@@ -22,5 +22,10 @@ urlpatterns = [
         "workspaces/<str:slug>/speech-to-text/token/",
         AssemblyAITokenEndpoint.as_view(),
         name="speech-to-text-token",
+    ),
+    path(
+        "workspaces/<str:slug>/speech-to-text/smart-process/",
+        SmartTranscriptEndpoint.as_view(),
+        name="smart-transcript",
     ),
 ]
