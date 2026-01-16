@@ -61,15 +61,24 @@ export const useIntentFirstSpeech = (options: UseIntentFirstSpeechOptions): UseI
 
   const handleTranscript = useCallback(
     async (text: string, isFinal: boolean) => {
+      console.log("[IntentFirstSpeech] handleTranscript called:", { text, isFinal });
+      
       if (!isFinal) {
         accumulatedTranscriptRef.current = text;
         return;
       }
 
       const finalText = text.trim();
-      if (!finalText) return;
+      console.log("[IntentFirstSpeech] Final text:", finalText);
+      
+      if (!finalText) {
+        console.warn("[IntentFirstSpeech] Empty final text, skipping processing");
+        return;
+      }
 
       const intent = selectedIntentRef.current;
+      console.log("[IntentFirstSpeech] Selected intent:", intent);
+      
       if (!intent) {
         console.error("[IntentFirstSpeech] No intent selected");
         return;
@@ -79,13 +88,24 @@ export const useIntentFirstSpeech = (options: UseIntentFirstSpeechOptions): UseI
 
       try {
         const speechService = new SpeechService();
+        console.log("[IntentFirstSpeech] Calling processSmartTranscript with:", {
+          workspaceSlug,
+          transcript: finalText,
+          language: "fr",
+          intent,
+        });
+        
         const result = await speechService.processSmartTranscript(workspaceSlug, {
           transcript: finalText,
           language: "fr",
           intent,
         });
 
+        console.log("[IntentFirstSpeech] API result:", result);
+
         const formattedContent = getFormattedContentByIntent(result, intent);
+        console.log("[IntentFirstSpeech] Formatted content for intent", intent, ":", formattedContent);
+        
         onResult(formattedContent, intent);
       } catch (error) {
         console.error("[IntentFirstSpeech] Processing failed:", error);
