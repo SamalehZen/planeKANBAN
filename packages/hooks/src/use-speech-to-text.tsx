@@ -1,26 +1,42 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { SpeechService } from "@plane/services";
 
 interface UseSpeechToTextOptions {
   workspaceSlug: string;
   onTranscript: (text: string, isFinal: boolean) => void;
   onError?: (error: Error) => void;
+  silenceThreshold?: number;
+  onVolumeChange?: (volume: number) => void;
+  onRecordingTime?: (seconds: number) => void;
 }
 
 interface UseSpeechToTextReturn {
   isRecording: boolean;
   isConnecting: boolean;
+  isProcessing: boolean;
   startRecording: () => Promise<void>;
   stopRecording: () => void;
-  interimText: string;
+  recordingDuration: number;
+  currentVolume: number;
 }
 
+const SILENCE_VOLUME_THRESHOLD = 5;
+
 export const useSpeechToText = (options: UseSpeechToTextOptions): UseSpeechToTextReturn => {
-  const { workspaceSlug, onTranscript, onError } = options;
+  const { 
+    workspaceSlug, 
+    onTranscript, 
+    onError, 
+    silenceThreshold = 5000, 
+    onVolumeChange, 
+    onRecordingTime 
+  } = options;
 
   const [isRecording, setIsRecording] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [interimText, setInterimText] = useState("");
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const [currentVolume, setCurrentVolume] = useState(0);
 
   const websocketRef = useRef<WebSocket | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -28,9 +44,33 @@ export const useSpeechToText = (options: UseSpeechToTextOptions): UseSpeechToTex
   const audioContextRef = useRef<AudioContext | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const processedTurnsRef = useRef<Set<number>>(new Set());
+  const recordingStartRef = useRef<number | null>(null);
+  const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const accumulatedTextRef = useRef<string>("");
+  const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const calculateVolume = useCallback((inputData: Float32Array): number => {
+    let sum = 0;
+    for (let i = 0; i < inputData.length; i++) {
+      sum += inputData[i] * inputData[i];
+    }
+    const rms = Math.sqrt(sum / inputData.length);
+    return Math.min(100, Math.round(rms * 500));
+  }, []);
 
   const cleanup = useCallback(() => {
     console.log("[Speech] Cleaning up...");
+    
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
+
+    if (durationIntervalRef.current) {
+      clearInterval(durationIntervalRef.current);
+      durationIntervalRef.current = null;
+    }
+
     if (processorRef.current) {
       processorRef.current.disconnect();
       processorRef.current = null;
@@ -63,8 +103,40 @@ export const useSpeechToText = (options: UseSpeechToTextOptions): UseSpeechToTex
 
     setIsRecording(false);
     setIsConnecting(false);
-    setInterimText("");
+    setCurrentVolume(0);
+    setRecordingDuration(0);
+    recordingStartRef.current = null;
+    accumulatedTextRef.current = "";
   }, []);
+
+  const finishRecordingAndProcess = useCallback(() => {
+    console.log("[Speech] Silence detected - finishing recording");
+    const finalText = accumulatedTextRef.current.trim();
+    
+    if (finalText) {
+      setIsProcessing(true);
+      onTranscript(finalText, true);
+    }
+    
+    cleanup();
+    setIsProcessing(false);
+  }, [cleanup, onTranscript]);
+
+  useEffect(() => {
+    if (isRecording && recordingStartRef.current) {
+      durationIntervalRef.current = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - recordingStartRef.current!) / 1000);
+        setRecordingDuration(elapsed);
+        onRecordingTime?.(elapsed);
+      }, 1000);
+    }
+    return () => {
+      if (durationIntervalRef.current) {
+        clearInterval(durationIntervalRef.current);
+        durationIntervalRef.current = null;
+      }
+    };
+  }, [isRecording, onRecordingTime]);
 
   const floatTo16BitPCM = (float32Array: Float32Array): ArrayBuffer => {
     const buffer = new ArrayBuffer(float32Array.length * 2);
@@ -83,6 +155,7 @@ export const useSpeechToText = (options: UseSpeechToTextOptions): UseSpeechToTex
     }
 
     console.log("[Speech] Starting recording for workspace:", workspaceSlug);
+    accumulatedTextRef.current = "";
 
     try {
       setIsConnecting(true);
@@ -121,6 +194,7 @@ export const useSpeechToText = (options: UseSpeechToTextOptions): UseSpeechToTex
         console.log("[Speech] WebSocket connected successfully!");
         setIsConnecting(false);
         setIsRecording(true);
+        recordingStartRef.current = Date.now();
 
         const audioContext = new AudioContext({ sampleRate: 16000 });
         audioContextRef.current = audioContext;
@@ -131,8 +205,26 @@ export const useSpeechToText = (options: UseSpeechToTextOptions): UseSpeechToTex
 
         let audioChunkCount = 0;
         processor.onaudioprocess = (e) => {
+          const inputData = e.inputBuffer.getChannelData(0);
+          
+          const volume = calculateVolume(inputData);
+          setCurrentVolume(volume);
+          onVolumeChange?.(volume);
+
+          if (volume > SILENCE_VOLUME_THRESHOLD) {
+            if (silenceTimerRef.current) {
+              clearTimeout(silenceTimerRef.current);
+              silenceTimerRef.current = null;
+            }
+          } else {
+            if (!silenceTimerRef.current && websocketRef.current?.readyState === WebSocket.OPEN) {
+              silenceTimerRef.current = setTimeout(() => {
+                finishRecordingAndProcess();
+              }, silenceThreshold);
+            }
+          }
+
           if (ws.readyState === WebSocket.OPEN) {
-            const inputData = e.inputBuffer.getChannelData(0);
             const pcmData = floatTo16BitPCM(inputData);
             ws.send(pcmData);
             audioChunkCount++;
@@ -170,10 +262,10 @@ export const useSpeechToText = (options: UseSpeechToTextOptions): UseSpeechToTex
               }
               processedTurnsRef.current.add(turnOrder);
               console.log("[Speech] Final transcript (turn ", turnOrder, "):", data.transcript);
-              setInterimText("");
-              onTranscript(data.transcript, true);
+              accumulatedTextRef.current += (accumulatedTextRef.current ? " " : "") + data.transcript;
+              onTranscript(data.transcript, false);
             } else {
-              setInterimText(data.transcript);
+              onTranscript(data.transcript, false);
             }
           } else if (data.type === "Begin") {
             console.log("[Speech] Session started (multilingual)");
@@ -209,18 +301,24 @@ export const useSpeechToText = (options: UseSpeechToTextOptions): UseSpeechToTex
         onError?.(err);
       }
     }
-  }, [workspaceSlug, isRecording, isConnecting, onTranscript, onError, cleanup]);
+  }, [workspaceSlug, isRecording, isConnecting, onTranscript, onError, cleanup, calculateVolume, onVolumeChange, silenceThreshold, finishRecordingAndProcess]);
 
   const stopRecording = useCallback(() => {
     console.log("[Speech] Stop recording requested");
+    const finalText = accumulatedTextRef.current.trim();
+    if (finalText) {
+      onTranscript(finalText, true);
+    }
     cleanup();
-  }, [cleanup]);
+  }, [cleanup, onTranscript]);
 
   return {
     isRecording,
     isConnecting,
+    isProcessing,
     startRecording,
     stopRecording,
-    interimText,
+    recordingDuration,
+    currentVolume,
   };
 };

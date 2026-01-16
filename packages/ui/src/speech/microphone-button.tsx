@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import { useSpeechToText } from "@plane/hooks";
 import { cn } from "../utils";
 import { Tooltip } from "../tooltip";
+import { RecordingIndicator } from "./recording-indicator";
 
 type TButtonSize = "sm" | "md" | "lg";
 
@@ -15,6 +16,8 @@ export interface MicrophoneButtonProps {
   size?: TButtonSize;
   disabled?: boolean;
   tooltipPosition?: "top" | "bottom" | "left" | "right";
+  showRecordingIndicator?: boolean;
+  silenceThreshold?: number;
 }
 
 const SIZE_CLASSES: Record<TButtonSize, string> = {
@@ -37,8 +40,12 @@ export const MicrophoneButton: React.FC<MicrophoneButtonProps> = ({
   size = "md",
   disabled = false,
   tooltipPosition = "top",
+  showRecordingIndicator = true,
+  silenceThreshold = 5000,
 }) => {
   const [localInterimText, setLocalInterimText] = useState("");
+  const [volume, setVolume] = useState(0);
+  const [duration, setDuration] = useState(0);
 
   const handleTranscript = useCallback(
     (text: string, isFinal: boolean) => {
@@ -52,10 +59,13 @@ export const MicrophoneButton: React.FC<MicrophoneButtonProps> = ({
     [onTranscript]
   );
 
-  const { isRecording, isConnecting, startRecording, stopRecording } = useSpeechToText({
+  const { isRecording, isConnecting, isProcessing, startRecording, stopRecording, recordingDuration, currentVolume } = useSpeechToText({
     workspaceSlug,
     onTranscript: handleTranscript,
     onError,
+    silenceThreshold,
+    onVolumeChange: setVolume,
+    onRecordingTime: setDuration,
   });
 
   const handleClick = useCallback(() => {
@@ -67,10 +77,12 @@ export const MicrophoneButton: React.FC<MicrophoneButtonProps> = ({
   }, [isRecording, startRecording, stopRecording]);
 
   const tooltipContent = isConnecting
-    ? "Connecting..."
-    : isRecording
-      ? "Stop recording"
-      : "Start voice input";
+    ? "Connexion..."
+    : isProcessing
+      ? "Traitement..."
+      : isRecording
+        ? "Arrêter l'enregistrement"
+        : "Démarrer la saisie vocale";
 
   return (
     <div className="relative inline-flex items-center">
@@ -78,21 +90,22 @@ export const MicrophoneButton: React.FC<MicrophoneButtonProps> = ({
         <button
           type="button"
           onClick={handleClick}
-          disabled={disabled || isConnecting}
+          disabled={disabled || isConnecting || isProcessing}
           className={cn(
             "grid place-items-center rounded-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-1",
             SIZE_CLASSES[size],
             {
               "bg-red-500 text-white animate-pulse focus:ring-red-400": isRecording,
+              "bg-custom-primary-100/10 text-custom-primary-100": isProcessing,
               "bg-layer-1 text-tertiary hover:bg-layer-2 hover:text-secondary focus:ring-accent-primary":
-                !isRecording && !disabled,
+                !isRecording && !isProcessing && !disabled,
               "opacity-50 cursor-not-allowed": isConnecting || disabled,
             },
             className
           )}
           aria-label={tooltipContent}
         >
-          {isConnecting ? (
+          {isConnecting || isProcessing ? (
             <Loader2 className={cn(ICON_SIZE_CLASSES[size], "animate-spin")} />
           ) : isRecording ? (
             <MicOff className={ICON_SIZE_CLASSES[size]} />
@@ -101,7 +114,16 @@ export const MicrophoneButton: React.FC<MicrophoneButtonProps> = ({
           )}
         </button>
       </Tooltip>
-      {isRecording && localInterimText && (
+      {showRecordingIndicator && isRecording && (
+        <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 z-10">
+          <RecordingIndicator
+            isRecording={isRecording}
+            volume={currentVolume}
+            duration={recordingDuration}
+          />
+        </div>
+      )}
+      {!showRecordingIndicator && isRecording && localInterimText && (
         <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 max-w-xs px-2 py-1 text-xs bg-layer-2 text-secondary rounded shadow-sm border border-subtle whitespace-nowrap overflow-hidden text-ellipsis z-10">
           {localInterimText}
         </div>
