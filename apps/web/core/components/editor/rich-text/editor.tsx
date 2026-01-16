@@ -1,14 +1,13 @@
 import { forwardRef, useCallback, useState, useRef, useEffect } from "react";
-import { Loader2 } from "lucide-react";
 import { AI_EDITOR_TASKS } from "@plane/constants";
 import { RichTextEditorWithRef } from "@plane/editor";
 import type { EditorRefApi, IRichTextEditorProps, TAIActionPayload, TFileHandler } from "@plane/editor";
-import { useSmartSpeechToText } from "@plane/hooks";
+import { useIntentFirstSpeech } from "@plane/hooks";
 import type { TIntentType } from "@plane/services";
 import type { MakeOptional, TSearchEntityRequestPayload, TSearchResponse } from "@plane/types";
-import { RecordingIndicator, IntentConfirmationModal } from "@plane/ui";
 import { cn } from "@plane/utils";
 import { EditorMentionsRoot } from "@/components/editor/embeds/mentions";
+import { VoiceAssistantOverlay } from "@/components/speech";
 import { useEditorConfig, useEditorMention } from "@/hooks/editor";
 import { useMember } from "@/hooks/store/use-member";
 import { useParseEditorContent } from "@/hooks/use-parse-editor-content";
@@ -56,9 +55,10 @@ export const RichTextEditor = forwardRef(function RichTextEditor(
   const { getEditorMetaData } = useParseEditorContent({ projectId, workspaceSlug });
 
   const editorRefInternal = useRef<EditorRefApi | null>(null);
-  const [currentNodeInfo, setCurrentNodeInfo] = useState<{ from: number; to: number } | null>(null);
+  const [showVoiceOverlay, setShowVoiceOverlay] = useState(false);
+  const [uiState, setUiState] = useState<"menu" | "listening" | "processing" | "result">("menu");
 
-  const insertContent = useCallback((intent: TIntentType, content: string) => {
+  const insertContent = useCallback((content: string, intent: TIntentType) => {
     const editor = editorRefInternal.current;
     if (!editor || !content) return;
     
@@ -79,36 +79,55 @@ export const RichTextEditor = forwardRef(function RichTextEditor(
     } else {
       editor.insertTextAtCursor(content + " ");
     }
+
+    setUiState("result");
+    setTimeout(() => {
+      setShowVoiceOverlay(false);
+      setUiState("menu");
+    }, 1500);
   }, []);
 
-  const {
-    isRecording,
-    isConnecting,
-    isProcessing,
-    startRecording,
-    stopRecording,
-    recordingDuration,
-    currentVolume,
-    smartResult,
-    showIntentModal,
-    selectIntent,
-    closeModal,
-  } = useSmartSpeechToText({
+  const speech = useIntentFirstSpeech({
     workspaceSlug: workspaceSlug || "",
-    onIntentSelect: insertContent,
-    silenceThreshold: 5000,
+    onResult: insertContent,
   });
 
+  useEffect(() => {
+    if (speech.isRecording) {
+      setUiState("listening");
+    } else if (speech.isProcessing) {
+      setUiState("processing");
+    }
+  }, [speech.isRecording, speech.isProcessing]);
+
+  const handleIntentSelect = useCallback(
+    async (intent: TIntentType) => {
+      setUiState("listening");
+      await speech.startWithIntent(intent);
+    },
+    [speech]
+  );
+
+  const handleStop = useCallback(() => {
+    speech.stopAndProcess();
+    setUiState("processing");
+  }, [speech]);
+
+  const handleClose = useCallback(() => {
+    setShowVoiceOverlay(false);
+    setUiState("menu");
+    speech.closeIntentPicker();
+  }, [speech]);
+
   const speechHandler = {
-    onStart: (nodeInfo?: { from: number; to: number }) => {
-      setCurrentNodeInfo(nodeInfo || null);
-      startRecording();
+    onStart: () => {
+      setShowVoiceOverlay(true);
+      setUiState("menu");
     },
     onStop: () => {
-      stopRecording();
-      setCurrentNodeInfo(null);
+      handleStop();
     },
-    isRecording: () => isRecording,
+    isRecording: () => speech.isRecording,
   };
 
   const handleAISelectionAction = useCallback(
@@ -188,33 +207,17 @@ export const RichTextEditor = forwardRef(function RichTextEditor(
         containerClassName={cn("relative pl-3 pb-3", containerClassName)}
       />
 
-      <RecordingIndicator
-        isRecording={isRecording}
-        volume={currentVolume}
-        duration={recordingDuration}
-        className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50"
-      />
-
-      {isProcessing && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 bg-custom-primary-100/10 rounded-lg border border-custom-primary-100/20">
-          <Loader2 className="w-4 h-4 animate-spin text-custom-primary-100" />
-          <span className="text-sm text-custom-primary-100">Analyse en cours...</span>
-        </div>
+      {showVoiceOverlay && (
+        <VoiceAssistantOverlay
+          state={uiState}
+          intent={speech.selectedIntent}
+          duration={speech.recordingDuration}
+          volume={speech.currentVolume}
+          onSelectIntent={handleIntentSelect}
+          onStop={handleStop}
+          onClose={handleClose}
+        />
       )}
-
-      <IntentConfirmationModal
-        isOpen={showIntentModal}
-        onClose={closeModal}
-        onConfirm={selectIntent}
-        primaryIntent={smartResult?.intent || "note"}
-        secondaryIntent={smartResult?.secondary_intent}
-        preview={smartResult?.formatted_content || ""}
-        originalTranscript={smartResult?.original_transcript}
-        formattedTodo={smartResult?.formatted_todo}
-        formattedNote={smartResult?.formatted_note}
-        formattedPlanning={smartResult?.formatted_planning}
-        formattedLongText={smartResult?.formatted_long_text}
-      />
     </>
   );
 });
