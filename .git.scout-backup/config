@@ -1,0 +1,15 @@
+[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = false
+	logallrefupdates = true
+[remote "origin"]
+	url = https://github.com/SamalehZen/planeKANBAN.git
+	tagOpt = --no-tags
+	fetch = +refs/heads/SPEECH-TO-TEXT-+-SUMMARIZE:refs/remotes/origin/SPEECH-TO-TEXT-+-SUMMARIZE
+[branch "SPEECH-TO-TEXT-+-SUMMARIZE"]
+	remote = origin
+	merge = refs/heads/SPEECH-TO-TEXT-+-SUMMARIZE
+[user]
+	name = SamalehZen
+	email = samaleh20177@gmail.com
