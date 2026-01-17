@@ -91,15 +91,20 @@ export default function VoiceAssistantDemo() {
   const playStartSound = () => {
     const AudioCtx: typeof AudioContext | undefined = (window as any).AudioContext || (window as any).webkitAudioContext;
     if (!AudioCtx) return;
+
     const audioContext = new AudioCtx();
     const oscillator = audioContext.createOscillator();
     const gainNode = audioContext.createGain();
+
     oscillator.connect(gainNode);
     gainNode.connect(audioContext.destination);
+
     oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
     oscillator.frequency.exponentialRampToValueAtTime(1200, audioContext.currentTime + 0.1);
+
     gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
     gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+
     oscillator.start(audioContext.currentTime);
     oscillator.stop(audioContext.currentTime + 0.1);
   };
@@ -107,21 +112,26 @@ export default function VoiceAssistantDemo() {
   const playEndSound = () => {
     const AudioCtx: typeof AudioContext | undefined = (window as any).AudioContext || (window as any).webkitAudioContext;
     if (!AudioCtx) return;
+
     const audioContext = new AudioCtx();
     const oscillator = audioContext.createOscillator();
     const gainNode = audioContext.createGain();
+
     oscillator.connect(gainNode);
     gainNode.connect(audioContext.destination);
+
     oscillator.frequency.setValueAtTime(523, audioContext.currentTime);
     oscillator.frequency.exponentialRampToValueAtTime(659, audioContext.currentTime + 0.12);
+
     gainNode.gain.setValueAtTime(0.25, audioContext.currentTime);
     gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.15);
+
     oscillator.start(audioContext.currentTime);
     oscillator.stop(audioContext.currentTime + 0.15);
   };
 
   useEffect(() => {
-    const autoStart = setTimeout(() => {
+    const autoStart = window.setTimeout(() => {
       setIsVisible(true);
       setState('menu');
       playStartSound();
@@ -147,7 +157,7 @@ export default function VoiceAssistantDemo() {
     window.addEventListener('keydown', handleKeyDown);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
-      clearTimeout(autoStart);
+      window.clearTimeout(autoStart);
     };
   }, [isVisible]);
 
@@ -158,7 +168,6 @@ export default function VoiceAssistantDemo() {
         setTimer((prev) => prev + 1);
       }, 1000);
     }
-
     return () => {
       if (interval) window.clearInterval(interval);
     };
@@ -174,29 +183,29 @@ export default function VoiceAssistantDemo() {
     if (!isVisible) return;
 
     if (state === 'listening') {
-      const timeout = setTimeout(() => {
+      const timeout = window.setTimeout(() => {
         setState('processing');
       }, 4000);
-      return () => clearTimeout(timeout);
+      return () => window.clearTimeout(timeout);
     }
 
     if (state === 'processing') {
-      const timeout = setTimeout(() => {
+      const timeout = window.setTimeout(() => {
         setTranscript('Your speech has been perfectly transcribed with AI-powered grammar correction and enhancement.');
         setState('result');
       }, 3000);
-      return () => clearTimeout(timeout);
+      return () => window.clearTimeout(timeout);
     }
 
     if (state === 'result') {
       playEndSound();
-      const timeout = setTimeout(() => {
+      const timeout = window.setTimeout(() => {
         setIsVisible(false);
         setState('idle');
         setTimer(0);
         setSelectedAction(null);
       }, 5000);
-      return () => clearTimeout(timeout);
+      return () => window.clearTimeout(timeout);
     }
   }, [state, isVisible]);
 
@@ -469,6 +478,7 @@ export default function VoiceAssistantDemo() {
                 </p>
               </div>
             </div>
+
             <div className={cn('flex items-center justify-center gap-6 text-xs', isDark ? 'text-white/30' : 'text-slate-500')}>
               <div className="flex items-center gap-1.5">
                 <div className={cn('w-1.5 h-1.5 rounded-full', isDark ? 'bg-white/40' : 'bg-slate-400')} />
