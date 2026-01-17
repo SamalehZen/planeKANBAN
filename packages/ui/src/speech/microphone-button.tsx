@@ -1,20 +1,22 @@
-import { Loader2, Mic, MicOff } from "lucide-react";
+import { Mic } from "lucide-react";
 import * as React from "react";
-import { useState, useCallback } from "react";
-import { useSpeechToText } from "@plane/hooks";
+import { useState, useCallback, useRef } from "react";
 import { cn } from "../utils";
 import { Tooltip } from "../tooltip";
+import { VoiceAssistantModal } from "./voice-assistant-modal";
 
 type TButtonSize = "sm" | "md" | "lg";
 
 export interface MicrophoneButtonProps {
-  workspaceSlug: string;
+  workspaceSlug?: string;
   onTranscript: (text: string) => void;
   onError?: (error: Error) => void;
   className?: string;
   size?: TButtonSize;
   disabled?: boolean;
   tooltipPosition?: "top" | "bottom" | "left" | "right";
+  geminiApiKey?: string;
+  language?: string;
 }
 
 const SIZE_CLASSES: Record<TButtonSize, string> = {
@@ -30,83 +32,68 @@ const ICON_SIZE_CLASSES: Record<TButtonSize, string> = {
 };
 
 export const MicrophoneButton: React.FC<MicrophoneButtonProps> = ({
-  workspaceSlug,
   onTranscript,
-  onError,
   className,
   size = "md",
   disabled = false,
   tooltipPosition = "top",
+  geminiApiKey,
+  language = "fr-FR",
 }) => {
-  const [localInterimText, setLocalInterimText] = useState("");
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
 
-  const handleTranscript = useCallback(
-    (text: string, isFinal: boolean) => {
-      if (isFinal) {
-        onTranscript(text);
-        setLocalInterimText("");
-      } else {
-        setLocalInterimText(text);
-      }
+  const handleClick = useCallback(() => {
+    if (buttonRef.current) {
+      setAnchorRect(buttonRef.current.getBoundingClientRect());
+    }
+    setIsModalOpen(true);
+  }, []);
+
+  const handleResult = useCallback(
+    (text: string) => {
+      onTranscript(text);
     },
     [onTranscript]
   );
 
-  const { isRecording, isConnecting, startRecording, stopRecording } = useSpeechToText({
-    workspaceSlug,
-    onTranscript: handleTranscript,
-    onError,
-  });
-
-  const handleClick = useCallback(() => {
-    if (isRecording) {
-      stopRecording();
-    } else {
-      startRecording();
-    }
-  }, [isRecording, startRecording, stopRecording]);
-
-  const tooltipContent = isConnecting
-    ? "Connecting..."
-    : isRecording
-      ? "Stop recording"
-      : "Start voice input";
+  const handleClose = useCallback(() => {
+    setIsModalOpen(false);
+  }, []);
 
   return (
-    <div className="relative inline-flex items-center">
-      <Tooltip tooltipContent={tooltipContent} position={tooltipPosition}>
+    <>
+      <Tooltip tooltipContent="Saisie vocale" position={tooltipPosition}>
         <button
+          ref={buttonRef}
           type="button"
           onClick={handleClick}
-          disabled={disabled || isConnecting}
+          disabled={disabled}
           className={cn(
             "grid place-items-center rounded-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-1",
             SIZE_CLASSES[size],
             {
-              "bg-red-500 text-white animate-pulse focus:ring-red-400": isRecording,
-              "bg-layer-1 text-tertiary hover:bg-layer-2 hover:text-secondary focus:ring-accent-primary":
-                !isRecording && !disabled,
-              "opacity-50 cursor-not-allowed": isConnecting || disabled,
+              "bg-layer-1 text-tertiary hover:bg-layer-2 hover:text-secondary focus:ring-accent-primary": !disabled,
+              "opacity-50 cursor-not-allowed": disabled,
             },
             className
           )}
-          aria-label={tooltipContent}
+          aria-label="Saisie vocale"
         >
-          {isConnecting ? (
-            <Loader2 className={cn(ICON_SIZE_CLASSES[size], "animate-spin")} />
-          ) : isRecording ? (
-            <MicOff className={ICON_SIZE_CLASSES[size]} />
-          ) : (
-            <Mic className={ICON_SIZE_CLASSES[size]} />
-          )}
+          <Mic className={ICON_SIZE_CLASSES[size]} />
         </button>
       </Tooltip>
-      {isRecording && localInterimText && (
-        <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 max-w-xs px-2 py-1 text-xs bg-layer-2 text-secondary rounded shadow-sm border border-subtle whitespace-nowrap overflow-hidden text-ellipsis z-10">
-          {localInterimText}
-        </div>
-      )}
-    </div>
+
+      <VoiceAssistantModal
+        isOpen={isModalOpen}
+        onClose={handleClose}
+        onResult={handleResult}
+        geminiApiKey={geminiApiKey}
+        language={language}
+        anchorRect={anchorRect}
+      />
+    </>
   );
 };
 

@@ -9,6 +9,30 @@ from plane.license.utils.instance_value import get_configuration_value
 from plane.utils.exception_logger import log_exception
 
 from ..base import BaseAPIView
+from .base import get_llm_config
+
+
+class LLMConfigEndpoint(BaseAPIView):
+    """Endpoint to get LLM configuration for voice assistant"""
+    
+    @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
+    def get(self, request, slug):
+        api_key, model, provider = get_llm_config()
+
+        if not api_key or not model or not provider:
+            return Response(
+                {"error": "LLM provider not configured"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(
+            {
+                "api_key": api_key,
+                "model": model,
+                "provider": provider,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class AssemblyAITokenEndpoint(BaseAPIView):

@@ -23,7 +23,9 @@
     "clean": "rm -rf .turbo && rm -rf .next && rm -rf node_modules && rm -rf dist"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@plane/services": "workspace:*",
+    "framer-motion": "^12.23.12",
     "react": "catalog:"
   },
   "devDependencies": {
