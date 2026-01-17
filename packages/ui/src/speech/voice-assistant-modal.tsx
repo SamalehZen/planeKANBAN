@@ -1,10 +1,10 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { Mic, MicOff, Check, X, Loader2 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { MicOff, Check, X, Sparkles, Loader2, Key } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
-export type ProcessingMode = "auto" | "email" | "prompt" | "message" | "note" | "voice" | "document" | "planning";
-type VoiceState = "idle" | "loading" | "menu" | "listening" | "processing" | "result" | "error";
+export type ProcessingMode = 'auto' | 'email' | 'prompt' | 'message' | 'note' | 'voice' | 'document' | 'planning';
+type VoiceState = 'idle' | 'settings' | 'menu' | 'listening' | 'processing' | 'result' | 'error';
 
 interface SpeechRecognitionEvent {
   results: SpeechRecognitionResultList;
@@ -47,15 +47,17 @@ declare global {
   }
 }
 
+const STORAGE_KEY = 'plane_voice_gemini_key';
+
 const MODE_OPTIONS: { id: ProcessingMode; label: string; icon: string }[] = [
-  { id: "auto", label: "Auto", icon: "✨" },
-  { id: "email", label: "Email", icon: "📧" },
-  { id: "prompt", label: "Prompt", icon: "🪄" },
-  { id: "message", label: "Message", icon: "💬" },
-  { id: "note", label: "Note", icon: "📝" },
-  { id: "voice", label: "Texte", icon: "🎤" },
-  { id: "document", label: "Doc", icon: "📄" },
-  { id: "planning", label: "Planning", icon: "📅" },
+  { id: 'auto', label: 'Auto', icon: '✨' },
+  { id: 'email', label: 'Email', icon: '📧' },
+  { id: 'prompt', label: 'Prompt', icon: '🪄' },
+  { id: 'message', label: 'Message', icon: '💬' },
+  { id: 'note', label: 'Note', icon: '📝' },
+  { id: 'voice', label: 'Texte', icon: '🎤' },
+  { id: 'document', label: 'Doc', icon: '📄' },
+  { id: 'planning', label: 'Planning', icon: '📅' },
 ];
 
 const PROMPTS: Record<string, string> = {
@@ -67,12 +69,6 @@ const PROMPTS: Record<string, string> = {
   document: `Document: titre, sections. Réponds uniquement avec le document.`,
   planning: `Planning par date/heure. Réponds uniquement avec le planning.`,
 };
-
-interface LLMConfig {
-  api_key: string;
-  model: string;
-  provider: string;
-}
 
 const useThemeDetector = () => {
   const [isDark, setIsDark] = useState(true);
@@ -100,16 +96,106 @@ const useThemeDetector = () => {
   return isDark;
 };
 
-const AudioVisualizer = ({ isDark }: { isDark: boolean }) => (
-  <div className="flex items-center justify-center gap-[2px] h-8">
-    {Array.from({ length: 35 }).map((_, i) => (
-      <motion.div
-        key={i}
-        className={`w-[3px] rounded-full ${isDark ? "bg-white/80" : "bg-slate-800"}`}
-        animate={{ height: [6, 24 - Math.abs(i - 17) * 0.6, 10, 28 - Math.abs(i - 17), 8] }}
-        transition={{ duration: 1, repeat: Infinity, delay: i * 0.025 }}
-      />
-    ))}
+const RealTimeWaveform = ({ isListening, isDark }: { isListening: boolean; isDark: boolean }) => {
+  const BAR_COUNT = 32;
+  const [data, setData] = useState<number[]>(new Array(BAR_COUNT).fill(4));
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const rafRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!isListening) return;
+
+    const setupAudio = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        streamRef.current = stream;
+        
+        const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        const ctx = new AudioContextClass();
+        audioContextRef.current = ctx;
+        
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 128;
+        analyser.smoothingTimeConstant = 0.5;
+        analyserRef.current = analyser;
+        
+        const source = ctx.createMediaStreamSource(stream);
+        source.connect(analyser);
+
+        const bufferLength = analyser.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
+
+        const tick = () => {
+          analyser.getByteFrequencyData(dataArray);
+          const bars = [];
+          const halfCount = BAR_COUNT / 2;
+          
+          for (let i = 0; i < halfCount; i++) {
+             const index = Math.floor(i * (bufferLength / 2) / halfCount);
+             const value = dataArray[index];
+             const height = Math.max(4, (value / 255) * 40);
+             bars.push(height);
+          }
+          
+          const mirrored = [...bars.slice().reverse(), ...bars];
+          setData(mirrored);
+          rafRef.current = requestAnimationFrame(tick);
+        };
+        
+        tick();
+      } catch (error) {
+        console.error("Erreur micro:", error);
+      }
+    };
+
+    setupAudio();
+
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
+      if (audioContextRef.current) audioContextRef.current.close();
+    };
+  }, [isListening]);
+
+  return (
+    <div className="flex items-center justify-center gap-[3px] h-12">
+      {data.map((h, i) => (
+        <motion.div
+          key={i}
+          className={isDark 
+            ? "w-[3px] rounded-full bg-gradient-to-t from-white/40 via-white to-white/40" 
+            : "w-[3px] rounded-full bg-gradient-to-t from-indigo-500/40 via-indigo-600 to-indigo-500/40"
+          }
+          animate={{ height: h }}
+          transition={{ type: "spring", stiffness: 300, damping: 20 }}
+        />
+      ))}
+    </div>
+  );
+};
+
+const LoadingOrb = ({ isDark }: { isDark: boolean }) => (
+  <div className="relative flex items-center justify-center w-full h-12">
+    <div className="flex gap-2">
+      {[0, 1, 2].map((i) => (
+        <motion.div
+          key={i}
+          className={`w-3 h-3 rounded-full blur-[1px] ${isDark ? "bg-white" : "bg-indigo-600"}`}
+          animate={{
+            scale: [0.8, 1.2, 0.8],
+            opacity: [0.4, 1, 0.4],
+          }}
+          transition={{
+            duration: 1.4,
+            repeat: Infinity,
+            delay: i * 0.2,
+            ease: "easeInOut",
+          }}
+        />
+      ))}
+    </div>
   </div>
 );
 
@@ -122,147 +208,114 @@ export interface VoiceAssistantModalProps {
   workspaceSlug: string;
 }
 
-const llmConfigCache: { [slug: string]: LLMConfig } = {};
-
 export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
   isOpen,
   onClose,
   onResult,
   language = "fr-FR",
-  anchorRect,
-  workspaceSlug,
 }) => {
   const isDark = useThemeDetector();
-  const [state, setState] = useState<VoiceState>("loading");
+  const [state, setState] = useState<VoiceState>("settings");
   const [selectedMode, setSelectedMode] = useState<ProcessingMode>("auto");
   const [timer, setTimer] = useState(0);
   const [liveText, setLiveText] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
-  const [llmConfig, setLlmConfig] = useState<LLMConfig | null>(null);
+  const [apiKey, setApiKey] = useState("");
+  const [tempApiKey, setTempApiKey] = useState("");
 
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const transcriptRef = useRef("");
 
-  const fetchLLMConfig = useCallback(async () => {
-    if (llmConfigCache[workspaceSlug]) {
-      setLlmConfig(llmConfigCache[workspaceSlug]);
-      setState("menu");
-      return;
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      setApiKey(saved);
+      setTempApiKey(saved);
     }
-
-    try {
-      const response = await fetch(`/api/workspaces/${workspaceSlug}/llm-config/`, {
-        method: "GET",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "LLM non configuré");
-      }
-
-      const config: LLMConfig = await response.json();
-      llmConfigCache[workspaceSlug] = config;
-      setLlmConfig(config);
-      setState("menu");
-    } catch (err) {
-      console.error("Failed to fetch LLM config:", err);
-      setErrorMsg(err instanceof Error ? err.message : "LLM non configuré dans admin");
-      setState("error");
-    }
-  }, [workspaceSlug]);
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
       setLiveText("");
       setErrorMsg("");
       setTimer(0);
-      
-      if (llmConfig) {
-        setState("menu");
-      } else {
-        setState("loading");
-        fetchLLMConfig();
-      }
+      setState(apiKey ? "menu" : "settings");
     }
-  }, [isOpen, llmConfig, fetchLLMConfig]);
+  }, [isOpen, apiKey]);
 
   useEffect(() => {
-    let i: ReturnType<typeof setInterval>;
-    if (state === "listening") i = setInterval(() => setTimer((t) => t + 1), 1000);
-    return () => clearInterval(i);
+    let interval: ReturnType<typeof setInterval>;
+    if (state === 'listening') {
+      interval = setInterval(() => setTimer(t => t + 1), 1000);
+    }
+    return () => clearInterval(interval);
   }, [state]);
 
-  const processWithGemini = useCallback(
-    async (text: string, mode: ProcessingMode) => {
-      if (mode === "voice" || !llmConfig) return { result: text };
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) recognitionRef.current.stop();
+    };
+  }, []);
 
-      const genAI = new GoogleGenerativeAI(llmConfig.api_key);
-      const model = genAI.getGenerativeModel({ model: llmConfig.model });
-      const r = await model.generateContent(`${PROMPTS[mode]}\n\nTexte:"${text}"`);
-      return { result: r.response.text() };
-    },
-    [llmConfig]
-  );
+  const saveApiKey = useCallback(() => {
+    if (tempApiKey.trim()) {
+      localStorage.setItem(STORAGE_KEY, tempApiKey.trim());
+      setApiKey(tempApiKey.trim());
+      setState("menu");
+    }
+  }, [tempApiKey]);
 
-  const startRecording = useCallback(
-    (mode: ProcessingMode) => {
-      const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const processWithGemini = useCallback(async (text: string, mode: ProcessingMode) => {
+    if (mode === 'voice' || !apiKey) return { result: text };
+    
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    const r = await model.generateContent(`${PROMPTS[mode]}\n\nTexte:"${text}"`);
+    return { result: r.response.text() };
+  }, [apiKey]);
 
-      if (!SpeechRecognitionAPI) {
-        setErrorMsg("Speech API non supporté");
-        setState("error");
-        return;
+  const startRecording = useCallback((mode: ProcessingMode) => {
+    const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognitionAPI) {
+      setErrorMsg('Navigateur non supporté');
+      setState('error');
+      return;
+    }
+
+    setSelectedMode(mode);
+    setErrorMsg('');
+    setLiveText('');
+    transcriptRef.current = '';
+
+    const recognition = new SpeechRecognitionAPI();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = language;
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      let interim = '';
+      let final = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i];
+        if (result.isFinal) final += result[0].transcript;
+        else interim += result[0].transcript;
       }
+      if (final) transcriptRef.current += final;
+      setLiveText(transcriptRef.current + interim);
+    };
 
-      setSelectedMode(mode);
-      setErrorMsg("");
-      setLiveText("");
-      transcriptRef.current = "";
+    recognition.onerror = (event: { error: string }) => {
+      if (event.error !== 'no-speech') {
+        setErrorMsg(event.error);
+        setState('error');
+      }
+    };
 
-      const recognition = new SpeechRecognitionAPI();
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.lang = language;
-
-      recognition.onresult = (event: SpeechRecognitionEvent) => {
-        let interim = "";
-        let final = "";
-
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const result = event.results[i];
-          if (result.isFinal) {
-            final += result[0].transcript;
-          } else {
-            interim += result[0].transcript;
-          }
-        }
-
-        if (final) {
-          transcriptRef.current += final;
-        }
-
-        setLiveText(transcriptRef.current + interim);
-      };
-
-      recognition.onerror = (event: { error: string }) => {
-        console.error("Speech error:", event.error);
-        if (event.error !== "no-speech") {
-          setErrorMsg(`Erreur: ${event.error}`);
-          setState("error");
-        }
-      };
-
-      recognitionRef.current = recognition;
-      recognition.start();
-      setState("listening");
-      setTimer(0);
-    },
-    [language]
-  );
+    recognitionRef.current = recognition;
+    recognition.start();
+    setState('listening');
+    setTimer(0);
+  }, [language]);
 
   const stopRecording = useCallback(async () => {
     if (recognitionRef.current) {
@@ -271,26 +324,24 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
     }
 
     const transcript = transcriptRef.current.trim();
-
     if (!transcript) {
-      setState("menu");
-      setLiveText("");
+      setState('menu');
       return;
     }
 
-    setState("processing");
+    setState('processing');
 
     try {
       const { result } = await processWithGemini(transcript, selectedMode);
-      setState("result");
+      setState('result');
       setTimeout(() => {
         onResult(result);
         onClose();
-      }, 600);
+      }, 1000);
     } catch (err) {
-      console.error(err);
-      setErrorMsg(err instanceof Error ? err.message : "Erreur Gemini");
-      setState("error");
+      const msg = err instanceof Error ? err.message : 'Erreur IA';
+      setErrorMsg(msg);
+      setState('error');
     }
   }, [selectedMode, processWithGemini, onResult, onClose]);
 
@@ -302,15 +353,7 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
     onClose();
   }, [onClose]);
 
-  const getModalPosition = () => {
-    if (!anchorRect) {
-      return { top: "50%", left: "50%", transform: "translate(-50%, -50%)" };
-    }
-    return {
-      top: anchorRect.bottom + 8,
-      left: Math.max(8, anchorRect.left - 100),
-    };
-  };
+  const formatTimer = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
 
   if (!isOpen) return null;
 
@@ -324,196 +367,225 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
         onClick={handleClose}
       >
         <motion.div
-          initial={{ opacity: 0, scale: 0.9, y: -20 }}
+          initial={{ opacity: 0, scale: 0.9, y: 40 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.9, y: -20 }}
-          transition={{ type: "spring", damping: 25, stiffness: 300 }}
-          className="fixed z-[10000] w-[300px]"
-          style={getModalPosition()}
+          exit={{ opacity: 0, scale: 0.9, y: 40 }}
+          transition={{ type: "spring", damping: 25, stiffness: 350 }}
+          className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[10000] w-[360px]"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className={`backdrop-blur-2xl rounded-2xl shadow-2xl overflow-hidden border ${
+          <div className={`relative overflow-hidden rounded-[36px] border backdrop-blur-[50px] shadow-2xl transition-all duration-500 ${
             isDark 
-              ? "bg-black/60 border-black" 
-              : "bg-white/60 border-white"
+              ? "bg-black/60 border-black shadow-black/50" 
+              : "bg-white/70 border-white shadow-xl"
           }`}>
-            <div className="p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div
-                    className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                      state === "result" 
-                        ? "bg-green-500/20" 
-                        : isDark ? "bg-violet-500/20" : "bg-violet-100"
+            <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+            <div className="absolute bottom-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+            
+            <div className="p-5">
+              <div className="flex items-center justify-between mb-6 pl-1">
+                <div className="flex items-center gap-3">
+                  <motion.div 
+                    layoutId="status-icon"
+                    className={`flex items-center justify-center w-10 h-10 rounded-full shadow-inner ${
+                      state === 'listening' ? "bg-red-500/10" : state === 'settings' ? "bg-amber-500/10" : isDark ? "bg-white/10" : "bg-black/5"
                     }`}
                   >
-                    {state === "result" ? (
-                      <Check className="w-4 h-4 text-green-500" />
-                    ) : state === "loading" ? (
-                      <Loader2 className={`w-4 h-4 animate-spin ${isDark ? "text-white" : "text-violet-600"}`} />
+                    {state === 'listening' ? (
+                      <motion.div 
+                        animate={{ scale: [1, 1.2, 1] }} 
+                        transition={{ repeat: Infinity, duration: 2 }}
+                        className="w-3 h-3 bg-red-500 rounded-full shadow-[0_0_12px_rgba(239,68,68,0.8)]" 
+                      />
+                    ) : state === 'settings' ? (
+                      <Key className={`w-5 h-5 ${isDark ? "text-amber-400" : "text-amber-600"}`} />
                     ) : (
-                      <Mic className={`w-4 h-4 ${isDark ? "text-white" : "text-violet-600"}`} />
+                      <Sparkles className={`w-5 h-5 ${isDark ? "text-white" : "text-black"}`} />
                     )}
-                  </div>
-                  <div>
-                    <p className={`text-sm font-medium ${isDark ? "text-white" : "text-slate-900"}`}>
-                      {state === "loading" && "Chargement..."}
-                      {state === "menu" && "Choisir le mode"}
-                      {state === "listening" && `${Math.floor(timer / 60)}:${(timer % 60).toString().padStart(2, "0")}`}
-                      {state === "processing" && "Traitement..."}
-                      {state === "result" && "Terminé !"}
-                      {state === "error" && "Erreur"}
-                    </p>
-                    {state === "error" && <p className="text-xs text-red-400">{errorMsg}</p>}
+                  </motion.div>
+                  
+                  <div className="flex flex-col">
+                    <motion.span 
+                      layout
+                      className={`text-sm font-semibold tracking-wide ${isDark ? "text-white" : "text-slate-900"}`}
+                    >
+                      {state === 'settings' && 'Configuration'}
+                      {state === 'listening' && 'En écoute'}
+                      {state === 'processing' && 'Traitement IA'}
+                      {state === 'result' && 'Terminé'}
+                      {state === 'menu' && 'Assistant'}
+                      {state === 'error' && 'Erreur'}
+                    </motion.span>
+                    <motion.span 
+                      initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                      className={`text-[11px] font-medium uppercase tracking-wider opacity-60 ${isDark ? "text-white" : "text-slate-900"}`}
+                    >
+                      {state === 'listening' ? formatTimer(timer) : state === 'menu' ? 'Sélectionner mode' : state === 'settings' ? 'Clé API requise' : '...'}
+                    </motion.span>
                   </div>
                 </div>
-                <button
+
+                <button 
                   onClick={handleClose}
-                  className={`p-1.5 rounded-lg transition-colors ${
-                    isDark ? "hover:bg-white/10" : "hover:bg-slate-100"
+                  className={`p-2 rounded-full transition-all active:scale-95 ${
+                    isDark ? "bg-white/10 hover:bg-white/20 text-white" : "bg-black/5 hover:bg-black/10 text-black"
                   }`}
                 >
-                  <X className={`w-4 h-4 ${isDark ? "text-white/60" : "text-slate-400"}`} />
+                  <X className="w-4 h-4" />
                 </button>
               </div>
 
               <AnimatePresence mode="wait">
-                {state === "loading" && (
-                  <motion.div
-                    key="loading"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="py-8 flex justify-center"
+                {state === 'settings' && (
+                  <motion.div 
+                    key="settings"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="space-y-4"
                   >
-                    <div className="flex gap-1">
-                      {[0, 1, 2].map((i) => (
-                        <motion.div
-                          key={i}
-                          className={`w-2.5 h-2.5 rounded-full ${isDark ? "bg-violet-400" : "bg-violet-500"}`}
-                          animate={{ y: [0, -8, 0] }}
-                          transition={{ duration: 0.4, repeat: Infinity, delay: i * 0.1 }}
-                        />
-                      ))}
+                    <div>
+                      <label className={`block text-xs font-medium mb-2 ${isDark ? "text-white/60" : "text-slate-500"}`}>
+                        Clé API Google Gemini
+                      </label>
+                      <input
+                        type="password"
+                        value={tempApiKey}
+                        onChange={(e) => setTempApiKey(e.target.value)}
+                        placeholder="AIza..."
+                        className={`w-full px-4 py-3 rounded-2xl border text-sm transition-all ${
+                          isDark 
+                            ? "bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-white/30" 
+                            : "bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-slate-400"
+                        } focus:outline-none`}
+                      />
+                      <p className={`text-[10px] mt-2 ${isDark ? "text-white/40" : "text-slate-400"}`}>
+                        Votre clé est stockée localement sur votre navigateur
+                      </p>
                     </div>
+                    
+                    <button
+                      onClick={saveApiKey}
+                      disabled={!tempApiKey.trim()}
+                      className={`w-full py-3 rounded-2xl text-sm font-semibold transition-all ${
+                        tempApiKey.trim()
+                          ? isDark 
+                            ? "bg-white text-black hover:bg-white/90" 
+                            : "bg-indigo-600 text-white hover:bg-indigo-700"
+                          : isDark
+                            ? "bg-white/10 text-white/30 cursor-not-allowed"
+                            : "bg-slate-100 text-slate-400 cursor-not-allowed"
+                      }`}
+                    >
+                      Continuer
+                    </button>
+
+                    <a 
+                      href="https://aistudio.google.com/apikey" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className={`block text-center text-xs ${isDark ? "text-indigo-400" : "text-indigo-600"} hover:underline`}
+                    >
+                      Obtenir une clé API gratuite →
+                    </a>
                   </motion.div>
                 )}
 
-                {state === "menu" && (
-                  <motion.div
+                {state === 'menu' && (
+                  <motion.div 
                     key="menu"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="grid grid-cols-4 gap-1.5"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="grid grid-cols-4 gap-3"
                   >
-                    {MODE_OPTIONS.map((opt) => (
+                    {MODE_OPTIONS.map((mode, i) => (
                       <motion.button
-                        key={opt.id}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => startRecording(opt.id)}
-                        className={`flex flex-col items-center gap-0.5 p-2 rounded-lg transition-colors ${
-                          isDark 
-                            ? "hover:bg-white/10 active:bg-white/20" 
-                            : "hover:bg-slate-100 active:bg-slate-200"
-                        }`}
+                        key={mode.id}
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: i * 0.03 }}
+                        whileTap={{ scale: 0.92 }}
+                        onClick={() => startRecording(mode.id)}
+                        className="flex flex-col items-center gap-2"
                       >
-                        <span className="text-lg">{opt.icon}</span>
-                        <span className={`text-[9px] ${isDark ? "text-white/60" : "text-slate-500"}`}>{opt.label}</span>
+                        <div className={`w-14 h-14 rounded-[18px] flex items-center justify-center text-2xl transition-all shadow-sm border ${
+                          isDark 
+                            ? "bg-white/5 border-white/5 hover:bg-white/10" 
+                            : "bg-white border-slate-100 hover:bg-slate-50 hover:shadow-md"
+                        }`}>
+                          {mode.icon}
+                        </div>
+                        <span className={`text-[10px] font-medium opacity-70 ${isDark ? "text-white" : "text-slate-900"}`}>
+                          {mode.label}
+                        </span>
                       </motion.button>
                     ))}
                   </motion.div>
                 )}
 
-                {state === "listening" && (
-                  <motion.div
+                {state === 'listening' && (
+                  <motion.div 
                     key="listening"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="py-2"
+                    className="flex flex-col items-center w-full"
                   >
-                    <AudioVisualizer isDark={isDark} />
-                    {liveText && (
-                      <p className={`text-xs mt-3 p-2 rounded-lg max-h-16 overflow-y-auto ${
-                        isDark ? "bg-white/5 text-white/70" : "bg-slate-50 text-slate-600"
-                      }`}>
-                        {liveText}
-                      </p>
-                    )}
+                    <div className="w-full h-16 flex items-center justify-center mb-2">
+                      <RealTimeWaveform isListening={true} isDark={isDark} />
+                    </div>
+                    
+                    <div className="w-full h-12 flex items-center justify-center px-4 mb-4">
+                       <p className={`text-sm text-center line-clamp-2 leading-relaxed ${
+                         isDark ? "text-white/80" : "text-slate-800"
+                       }`}>
+                         {liveText || "Parlez maintenant..."}
+                       </p>
+                    </div>
+
                     <motion.button
-                      whileTap={{ scale: 0.9 }}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
                       onClick={stopRecording}
-                      className="mt-4 mx-auto flex items-center justify-center w-14 h-14 rounded-full bg-red-500 text-white shadow-lg"
+                      className="w-16 h-16 rounded-full bg-gradient-to-t from-red-600 to-red-500 shadow-lg shadow-red-500/30 flex items-center justify-center text-white"
                     >
-                      <MicOff className="w-6 h-6" />
+                      <MicOff className="w-7 h-7" />
                     </motion.button>
                   </motion.div>
                 )}
 
-                {state === "processing" && (
-                  <motion.div
-                    key="processing"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="py-8 flex justify-center"
+                {state === 'processing' && (
+                  <motion.div key="processing" className="py-8 flex flex-col items-center">
+                    <LoadingOrb isDark={isDark} />
+                    <span className={`text-xs mt-4 opacity-50 ${isDark ? "text-white" : "text-black"}`}>
+                      Gemini réfléchit...
+                    </span>
+                  </motion.div>
+                )}
+
+                {state === 'result' && (
+                  <motion.div 
+                    key="result"
+                    initial={{ scale: 0.5, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="py-6 flex items-center justify-center"
                   >
-                    <div className="flex gap-1">
-                      {[0, 1, 2].map((i) => (
-                        <motion.div
-                          key={i}
-                          className={`w-2.5 h-2.5 rounded-full ${isDark ? "bg-violet-400" : "bg-violet-500"}`}
-                          animate={{ y: [0, -8, 0] }}
-                          transition={{ duration: 0.4, repeat: Infinity, delay: i * 0.1 }}
-                        />
-                      ))}
+                    <div className="w-20 h-20 rounded-full bg-green-500 flex items-center justify-center shadow-lg shadow-green-500/40">
+                      <Check className="w-10 h-10 text-white" strokeWidth={3} />
                     </div>
                   </motion.div>
                 )}
-
-                {state === "result" && (
-                  <motion.div
-                    key="result"
-                    initial={{ scale: 0.5 }}
-                    animate={{ scale: 1 }}
-                    className="py-6 flex justify-center"
-                  >
-                    <motion.div
-                      className="w-16 h-16 rounded-full bg-green-500 flex items-center justify-center"
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      transition={{ type: "spring", damping: 12 }}
-                    >
-                      <Check className="w-8 h-8 text-white" />
-                    </motion.div>
-                  </motion.div>
-                )}
-
-                {state === "error" && (
-                  <motion.div
-                    key="error"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="py-4 text-center space-y-3"
-                  >
-                    <p className={`text-xs ${isDark ? "text-white/40" : "text-slate-400"}`}>
-                      Configurez le LLM dans l'administration
-                    </p>
-                    <button
-                      onClick={() => {
-                        setLlmConfig(null);
-                        delete llmConfigCache[workspaceSlug];
-                        fetchLLMConfig();
-                      }}
-                      className={`px-6 py-2.5 rounded-xl text-sm transition-colors ${
-                        isDark 
-                          ? "bg-white/10 text-white hover:bg-white/20" 
-                          : "bg-slate-100 text-slate-900 hover:bg-slate-200"
-                      }`}
-                    >
-                      Réessayer
-                    </button>
+                
+                {state === 'error' && (
+                  <motion.div key="error" className="py-4 flex flex-col items-center text-center px-4">
+                     <p className="text-red-500 text-sm mb-4 font-medium">{errorMsg}</p>
+                     <button 
+                       onClick={() => setState(apiKey ? 'menu' : 'settings')} 
+                       className={`px-4 py-2 rounded-full text-xs font-semibold ${isDark ? "bg-white/10 text-white" : "bg-black/5 text-black"}`}
+                     >
+                       Réessayer
+                     </button>
                   </motion.div>
                 )}
               </AnimatePresence>
