@@ -152,38 +152,96 @@ export const PageEditorBody = observer(function PageEditorBody(props: Props) {
     
     console.log("[PageEditor] Inserting content:", { content, intent });
     
-    if (intent === "todo" || intent === "planning") {
+    if (intent === "todo") {
       const lines = content.split('\n').filter(l => l.trim());
       const taskItems: string[] = [];
       
       for (const line of lines) {
-        if (line.match(/^-\s*\[[ x]\]/)) {
-          const text = line.replace(/^-\s*\[[ x]\]\s*/, '').trim();
-          if (text) {
-            taskItems.push(`<li data-type="taskItem" data-checked="false"><p>${text}</p></li>`);
-          }
+        const text = line.replace(/^-\s*\[[ x]\]\s*/, '').replace(/^[-•]\s*/, '').trim();
+        if (text) {
+          taskItems.push(`<li data-type="taskItem" data-checked="false"><p>${text}</p></li>`);
         }
       }
       
-      console.log("[PageEditor] Task items found:", taskItems.length);
-      
       if (taskItems.length > 0) {
-        const html = `<ul data-type="taskList">${taskItems.join('')}</ul>`;
-        console.log("[PageEditor] Inserting HTML:", html);
+        const html = `
+          <div data-block-type="callout-component" data-logo-in-use="emoji" data-emoji-unicode="9989" data-emoji-url="https://cdn.jsdelivr.net/npm/emoji-datasource-apple/img/apple/64/2705.png" data-background="rgba(34, 197, 94, 0.1)">
+            <p><strong>✅ Tâches à faire</strong></p>
+          </div>
+          <ul data-type="taskList">${taskItems.join('')}</ul>
+          <hr/>
+        `;
         editor.insertContentAtCursor(html);
       } else {
-        console.log("[PageEditor] No task items found, inserting as text");
         editor.insertTextAtCursor(content + " ");
       }
     } else if (intent === "note") {
-      editor.insertTextAtCursor(content + " ");
+      const cleanContent = content.replace(/^[📝💡]\s*/, '').trim();
+      const html = `
+        <div data-block-type="callout-component" data-logo-in-use="emoji" data-emoji-unicode="128221" data-emoji-url="https://cdn.jsdelivr.net/npm/emoji-datasource-apple/img/apple/64/1f4dd.png" data-background="rgba(59, 130, 246, 0.1)">
+          <p><strong>📝 Note</strong></p>
+          <p>${cleanContent}</p>
+        </div>
+      `;
+      editor.insertContentAtCursor(html);
+    } else if (intent === "planning") {
+      const lines = content.split('\n').filter(l => l.trim());
+      const planItems: string[] = [];
+      
+      for (const line of lines) {
+        const text = line.replace(/^[-•📅🗓️]\s*/, '').replace(/^-\s*\[[ x]\]\s*/, '').trim();
+        if (text) {
+          planItems.push(`<li data-type="taskItem" data-checked="false"><p>📅 ${text}</p></li>`);
+        }
+      }
+      
+      if (planItems.length > 0) {
+        const html = `
+          <div data-block-type="callout-component" data-logo-in-use="emoji" data-emoji-unicode="128197" data-emoji-url="https://cdn.jsdelivr.net/npm/emoji-datasource-apple/img/apple/64/1f4c5.png" data-background="rgba(168, 85, 247, 0.1)">
+            <p><strong>📅 Planning</strong></p>
+          </div>
+          <ul data-type="taskList">${planItems.join('')}</ul>
+          <hr/>
+        `;
+        editor.insertContentAtCursor(html);
+      } else {
+        editor.insertTextAtCursor(content + " ");
+      }
     } else if (intent === "long_text") {
-      const htmlContent = content
+      let htmlContent = content;
+      
+      htmlContent = htmlContent
+        .replace(/^# (.+)$/gm, '<h1>$1</h1>')
         .replace(/^## (.+)$/gm, '<h2>$1</h2>')
         .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-        .replace(/\n\n/g, '</p><p>')
-        .replace(/\n/g, '<br/>');
-      editor.insertContentAtCursor(`<p>${htmlContent}</p>`);
+        .replace(/^#### (.+)$/gm, '<h4>$1</h4>');
+      
+      htmlContent = htmlContent.replace(/^>\s*(.+)$/gm, '<blockquote><p>$1</p></blockquote>');
+      
+      htmlContent = htmlContent.replace(/^[-•]\s+(.+)$/gm, '<li><p>$1</p></li>');
+      htmlContent = htmlContent.replace(/(<li><p>.+<\/p><\/li>\n?)+/g, '<ul>$&</ul>');
+      
+      htmlContent = htmlContent.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+      htmlContent = htmlContent.replace(/\*(.+?)\*/g, '<em>$1</em>');
+      
+      htmlContent = htmlContent.replace(/^---$/gm, '<hr/>');
+      
+      const paragraphs = htmlContent.split('\n\n').filter(p => p.trim());
+      htmlContent = paragraphs.map(p => {
+        if (p.startsWith('<h') || p.startsWith('<blockquote') || p.startsWith('<ul') || p.startsWith('<hr')) {
+          return p;
+        }
+        return `<p>${p.replace(/\n/g, '<br/>')}</p>`;
+      }).join('');
+      
+      const html = `
+        <div data-block-type="callout-component" data-logo-in-use="emoji" data-emoji-unicode="128196" data-emoji-url="https://cdn.jsdelivr.net/npm/emoji-datasource-apple/img/apple/64/1f4c4.png" data-background="rgba(251, 191, 36, 0.1)">
+          <p><strong>📄 Document</strong></p>
+        </div>
+        ${htmlContent}
+        <hr/>
+      `;
+      editor.insertContentAtCursor(html);
     } else {
       editor.insertTextAtCursor(content + " ");
     }

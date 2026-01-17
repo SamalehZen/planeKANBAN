@@ -76,32 +76,65 @@ export function IssueCommentToolbar(props: Props) {
       
       console.log("[LiteTextToolbar] Inserting content:", { content, intent });
       
-      if (intent === "todo" || intent === "planning") {
+      if (intent === "todo") {
         const lines = content.split('\n').filter(l => l.trim());
         const taskItems: string[] = [];
         
         for (const line of lines) {
-          if (line.match(/^-\s*\[[ x]\]/)) {
-            const text = line.replace(/^-\s*\[[ x]\]\s*/, '').trim();
-            if (text) {
-              taskItems.push(`<li data-type="taskItem" data-checked="false"><p>${text}</p></li>`);
-            }
+          const text = line.replace(/^-\s*\[[ x]\]\s*/, '').replace(/^[-•]\s*/, '').trim();
+          if (text) {
+            taskItems.push(`<li data-type="taskItem" data-checked="false"><p>✅ ${text}</p></li>`);
           }
         }
         
         if (taskItems.length > 0) {
-          const html = `<ul data-type="taskList">${taskItems.join('')}</ul>`;
+          const html = `<p><strong>📋 Tâches:</strong></p><ul data-type="taskList">${taskItems.join('')}</ul>`;
+          editorRef.insertContentAtCursor(html);
+        } else {
+          editorRef.insertTextAtCursor(content + " ");
+        }
+      } else if (intent === "note") {
+        const cleanContent = content.replace(/^[📝💡]\s*/, '').trim();
+        const html = `<blockquote><p>📝 <strong>Note:</strong> ${cleanContent}</p></blockquote>`;
+        editorRef.insertContentAtCursor(html);
+      } else if (intent === "planning") {
+        const lines = content.split('\n').filter(l => l.trim());
+        const planItems: string[] = [];
+        
+        for (const line of lines) {
+          const text = line.replace(/^[-•📅🗓️]\s*/, '').replace(/^-\s*\[[ x]\]\s*/, '').trim();
+          if (text) {
+            planItems.push(`<li data-type="taskItem" data-checked="false"><p>📅 ${text}</p></li>`);
+          }
+        }
+        
+        if (planItems.length > 0) {
+          const html = `<p><strong>🗓️ Planning:</strong></p><ul data-type="taskList">${planItems.join('')}</ul>`;
           editorRef.insertContentAtCursor(html);
         } else {
           editorRef.insertTextAtCursor(content + " ");
         }
       } else if (intent === "long_text") {
-        const htmlContent = content
-          .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-          .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-          .replace(/\n\n/g, '</p><p>')
-          .replace(/\n/g, '<br/>');
-        editorRef.insertContentAtCursor(`<p>${htmlContent}</p>`);
+        let htmlContent = content;
+        
+        htmlContent = htmlContent
+          .replace(/^## (.+)$/gm, '<h3>$1</h3>')
+          .replace(/^### (.+)$/gm, '<h4>$1</h4>');
+        
+        htmlContent = htmlContent.replace(/^>\s*(.+)$/gm, '<blockquote><p>$1</p></blockquote>');
+        htmlContent = htmlContent.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        htmlContent = htmlContent.replace(/\*(.+?)\*/g, '<em>$1</em>');
+        
+        const paragraphs = htmlContent.split('\n\n').filter(p => p.trim());
+        htmlContent = paragraphs.map(p => {
+          if (p.startsWith('<h') || p.startsWith('<blockquote')) {
+            return p;
+          }
+          return `<p>${p.replace(/\n/g, '<br/>')}</p>`;
+        }).join('');
+        
+        const html = `<p><strong>📄 Document:</strong></p>${htmlContent}`;
+        editorRef.insertContentAtCursor(html);
       } else {
         editorRef.insertTextAtCursor(content + " ");
       }
