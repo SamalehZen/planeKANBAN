@@ -125,7 +125,7 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
     }
 
     try {
-      const response = await fetch(`/api/v1/workspaces/${workspaceSlug}/llm-config/`, {
+      const response = await fetch(`/api/workspaces/${workspaceSlug}/llm-config/`, {
         method: "GET",
         credentials: "include",
         headers: {
