@@ -245,7 +245,7 @@ export default function VoiceAssistantDemo() {
           onClick={() => setIsDark(!isDark)}
           className={cn(
             'fixed top-6 right-6 z-50 p-3 rounded-xl border backdrop-blur-xl transition-colors',
-            isDark ? 'bg-black/80 border-white/10 text-white hover:bg-white/10' : 'bg-white/80 border-slate-200 text-slate-900 hover:bg-slate-100'
+            isDark ? 'bg-black/80 border-white/10 text-white hover:bg-white/10' : 'bg-white border-slate-100 text-slate-900 hover:bg-slate-50'
           )}
         >
           {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
@@ -274,7 +274,7 @@ export default function VoiceAssistantDemo() {
                   className={cn(
                     'relative backdrop-blur-xl border rounded-[24px] shadow-2xl overflow-hidden',
                     'transition-all duration-500',
-                    isDark ? 'bg-black/80 border-white/10' : 'bg-white/80 border-slate-200/50'
+                    isDark ? 'bg-black/80 border-white/10' : 'bg-white border-slate-100'
                   )}
                   style={{ width: state === 'result' ? '420px' : state === 'menu' ? '320px' : '380px' }}
                 >
@@ -345,7 +345,7 @@ export default function VoiceAssistantDemo() {
                         }}
                         className={cn(
                           'relative w-8 h-8 rounded-lg border flex items-center justify-center transition-colors overflow-hidden',
-                          isDark ? 'bg-white/5 hover:bg-white/10 border-white/10' : 'bg-slate-900/5 hover:bg-slate-900/10 border-slate-200'
+                          isDark ? 'bg-white/5 hover:bg-white/10 border-white/10' : 'bg-slate-50 hover:bg-slate-100 border-transparent'
                         )}
                       >
                         <div className={cn('absolute top-0 right-0 w-2 h-2 rounded-bl-lg blur-[1px]', isDark ? 'bg-white/20' : 'bg-slate-900/15')} />
@@ -382,7 +382,7 @@ export default function VoiceAssistantDemo() {
                                   'group relative w-full flex items-center gap-3.5 px-4 py-3 rounded-xl border transition-all overflow-hidden backdrop-blur-sm',
                                   isDark
                                     ? 'bg-white/5 hover:bg-white/10 border-white/10 hover:border-white/20'
-                                    : 'bg-slate-900/5 hover:bg-slate-900/10 border-slate-200 hover:border-slate-300'
+                                    : 'bg-slate-50 hover:bg-slate-100 border-transparent hover:border-transparent'
                                 )}
                               >
                                 <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-r from-transparent via-white/5 to-transparent" />
@@ -462,7 +462,7 @@ export default function VoiceAssistantDemo() {
 
         {!isVisible && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="text-center space-y-4">
-            <div className={cn('inline-flex items-center gap-3 px-6 py-3 rounded-2xl backdrop-blur-sm border', isDark ? 'bg-white/5 border-white/10' : 'bg-slate-900/5 border-slate-200')}>
+            <div className={cn('inline-flex items-center gap-3 px-6 py-3 rounded-2xl backdrop-blur-sm border', isDark ? 'bg-white/5 border-white/10' : 'bg-slate-50 border-transparent')}>
               <div className={cn('relative w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden', isDark ? 'bg-white/10' : 'bg-slate-900/10')}>
                 <div className={cn('absolute top-0 right-0 w-3 h-3 rounded-bl-lg blur-[2px]', isDark ? 'bg-white/20' : 'bg-slate-900/15')} />
                 <Mic className={cn('w-5 h-5 relative z-10', isDark ? 'text-white/80' : 'text-slate-700')} />
