@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Mic, MicOff, Check, X } from "lucide-react";
+import { Mic, MicOff, Check, X, Settings } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { cn } from "../utils";
 
 export type ProcessingMode = "auto" | "email" | "prompt" | "message" | "note" | "voice" | "document" | "planning";
-type VoiceState = "idle" | "menu" | "listening" | "processing" | "result" | "error";
+type VoiceState = "idle" | "menu" | "listening" | "processing" | "result" | "error" | "settings";
 
 interface SpeechRecognitionEvent {
   results: SpeechRecognitionResultList;
@@ -59,14 +60,16 @@ const MODE_OPTIONS: { id: ProcessingMode; label: string; icon: string }[] = [
 ];
 
 const PROMPTS: Record<string, string> = {
-  auto: `Détecte le type de contenu et traite-le. Réponds uniquement avec le texte traité, sans explication.`,
-  email: `Transforme ce texte en email professionnel avec: objet, introduction, corps, formule de politesse. Réponds uniquement avec l'email formaté.`,
-  prompt: `Optimise ce texte en prompt efficace pour un LLM. Réponds uniquement avec le prompt optimisé.`,
-  message: `Corrige l'orthographe et la grammaire sans changer le sens. Réponds uniquement avec le texte corrigé.`,
-  note: `Transforme en liste de tâches avec ☐ devant chaque élément. Réponds uniquement avec la liste.`,
-  document: `Structure ce texte en document avec titre et sections. Réponds uniquement avec le document formaté.`,
-  planning: `Organise ce texte en planning par date/heure. Réponds uniquement avec le planning.`,
+  auto: `Détecte et traite. Réponds uniquement avec le texte traité.`,
+  email: `Email pro: objet, intro, corps, politesse. Réponds uniquement avec l'email.`,
+  prompt: `Prompt optimisé pour LLM. Réponds uniquement avec le prompt.`,
+  message: `Corrige orthographe sans changer le sens. Réponds uniquement avec le texte corrigé.`,
+  note: `Liste tâches avec ☐. Réponds uniquement avec la liste.`,
+  document: `Document: titre, sections. Réponds uniquement avec le document.`,
+  planning: `Planning par date/heure. Réponds uniquement avec le planning.`,
 };
+
+const STORAGE_KEY = "plane_voice_gemini_key";
 
 const AudioVisualizer = () => (
   <div className="flex items-center justify-center gap-[2px] h-8">
@@ -85,7 +88,6 @@ export interface VoiceAssistantModalProps {
   isOpen: boolean;
   onClose: () => void;
   onResult: (text: string) => void;
-  workspaceSlug?: string;
   language?: string;
   anchorRect?: DOMRect | null;
 }
@@ -94,7 +96,6 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
   isOpen,
   onClose,
   onResult,
-  workspaceSlug,
   language = "fr-FR",
   anchorRect,
 }) => {
@@ -103,18 +104,28 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
   const [timer, setTimer] = useState(0);
   const [liveText, setLiveText] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [tempApiKey, setTempApiKey] = useState("");
 
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const transcriptRef = useRef("");
 
   useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      setApiKey(saved);
+      setTempApiKey(saved);
+    }
+  }, []);
+
+  useEffect(() => {
     if (isOpen) {
-      setState("menu");
+      setState(apiKey ? "menu" : "settings");
       setLiveText("");
       setErrorMsg("");
       setTimer(0);
     }
-  }, [isOpen]);
+  }, [isOpen, apiKey]);
 
   useEffect(() => {
     let i: ReturnType<typeof setInterval>;
@@ -122,32 +133,24 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
     return () => clearInterval(i);
   }, [state]);
 
-  const processWithBackendAI = useCallback(
+  const saveApiKey = useCallback(() => {
+    if (tempApiKey.trim()) {
+      localStorage.setItem(STORAGE_KEY, tempApiKey.trim());
+      setApiKey(tempApiKey.trim());
+      setState("menu");
+    }
+  }, [tempApiKey]);
+
+  const processWithGemini = useCallback(
     async (text: string, mode: ProcessingMode) => {
-      if (mode === "voice" || !workspaceSlug) return { result: text };
+      if (mode === "voice" || !apiKey) return { result: text };
 
-      const prompt = `${PROMPTS[mode]}\n\nTexte à traiter:\n"${text}"`;
-
-      const response = await fetch(`/api/workspaces/${workspaceSlug}/ai-assistant/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify({
-          prompt,
-          task: "voice_processing",
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Erreur lors du traitement IA");
-      }
-
-      const data = await response.json();
-      return { result: data.response || text };
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+      const r = await model.generateContent(`${PROMPTS[mode]}\n\nTexte:"${text}"`);
+      return { result: r.response.text() };
     },
-    [workspaceSlug]
+    [apiKey]
   );
 
   const startRecording = useCallback(
@@ -223,20 +226,18 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
     setState("processing");
 
     try {
-      const { result } = await processWithBackendAI(transcript, selectedMode);
-
+      const { result } = await processWithGemini(transcript, selectedMode);
       setState("result");
-
       setTimeout(() => {
         onResult(result);
         onClose();
-      }, 800);
+      }, 600);
     } catch (err) {
       console.error(err);
-      setErrorMsg(err instanceof Error ? err.message : "Erreur de traitement");
+      setErrorMsg(err instanceof Error ? err.message : "Erreur Gemini");
       setState("error");
     }
-  }, [selectedMode, processWithBackendAI, onResult, onClose]);
+  }, [selectedMode, processWithGemini, onResult, onClose]);
 
   const handleClose = useCallback(() => {
     if (recognitionRef.current) {
@@ -288,6 +289,8 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                   >
                     {state === "result" ? (
                       <Check className="w-4 h-4 text-green-500" />
+                    ) : state === "settings" ? (
+                      <Settings className="w-4 h-4 text-custom-primary-100" />
                     ) : (
                       <Mic className="w-4 h-4 text-custom-primary-100" />
                     )}
@@ -295,6 +298,7 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                   <div>
                     <p className="text-sm font-medium text-custom-text-100">
                       {state === "menu" && "Choisir le mode"}
+                      {state === "settings" && "Configuration"}
                       {state === "listening" && `${Math.floor(timer / 60)}:${(timer % 60).toString().padStart(2, "0")}`}
                       {state === "processing" && "Traitement..."}
                       {state === "result" && "Terminé !"}
@@ -303,15 +307,79 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                     {state === "error" && <p className="text-xs text-red-400">{errorMsg}</p>}
                   </div>
                 </div>
-                <button
-                  onClick={handleClose}
-                  className="p-1.5 rounded-lg hover:bg-custom-background-80 transition-colors"
-                >
-                  <X className="w-4 h-4 text-custom-text-300" />
-                </button>
+                <div className="flex items-center gap-1">
+                  {state === "menu" && (
+                    <button
+                      onClick={() => {
+                        setTempApiKey(apiKey);
+                        setState("settings");
+                      }}
+                      className="p-1.5 rounded-lg hover:bg-custom-background-80 transition-colors"
+                    >
+                      <Settings className="w-4 h-4 text-custom-text-300" />
+                    </button>
+                  )}
+                  <button
+                    onClick={handleClose}
+                    className="p-1.5 rounded-lg hover:bg-custom-background-80 transition-colors"
+                  >
+                    <X className="w-4 h-4 text-custom-text-300" />
+                  </button>
+                </div>
               </div>
 
               <AnimatePresence mode="wait">
+                {state === "settings" && (
+                  <motion.div
+                    key="settings"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="space-y-3"
+                  >
+                    <div>
+                      <label className="block text-xs font-medium text-custom-text-300 mb-1.5">
+                        Clé API Gemini
+                      </label>
+                      <input
+                        type="password"
+                        value={tempApiKey}
+                        onChange={(e) => setTempApiKey(e.target.value)}
+                        placeholder="AIza..."
+                        className="w-full px-3 py-2 rounded-lg border border-custom-border-200 bg-custom-background-90 text-custom-text-100 text-sm placeholder:text-custom-text-400 focus:outline-none focus:ring-2 focus:ring-custom-primary-100"
+                      />
+                      <p className="text-[10px] text-custom-text-400 mt-1">
+                        Appel direct = plus rapide (~2 sec)
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={saveApiKey}
+                        disabled={!tempApiKey.trim()}
+                        className="flex-1 px-3 py-2 rounded-lg text-sm font-medium bg-custom-primary-100 text-white hover:bg-custom-primary-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Sauvegarder
+                      </button>
+                      {apiKey && (
+                        <button
+                          onClick={() => setState("menu")}
+                          className="px-3 py-2 rounded-lg text-sm bg-custom-background-80 text-custom-text-200 hover:bg-custom-background-90 transition-colors"
+                        >
+                          Annuler
+                        </button>
+                      )}
+                    </div>
+                    <a
+                      href="https://aistudio.google.com/apikey"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block text-center text-xs text-custom-primary-100 hover:underline"
+                    >
+                      Obtenir une clé Gemini →
+                    </a>
+                  </motion.div>
+                )}
+
                 {state === "menu" && (
                   <motion.div
                     key="menu"
@@ -413,10 +481,6 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                   </motion.div>
                 )}
               </AnimatePresence>
-
-              {!workspaceSlug && state === "menu" && (
-                <p className="text-xs text-amber-500 mt-3 text-center">⚠️ Workspace non défini - Mode texte brut</p>
-              )}
             </div>
           </div>
         </motion.div>

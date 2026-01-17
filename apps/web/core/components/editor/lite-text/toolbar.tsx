@@ -219,7 +219,6 @@ export function IssueCommentToolbar(props: Props) {
         isOpen={isVoiceModalOpen}
         onClose={() => setIsVoiceModalOpen(false)}
         onResult={handleVoiceResult}
-        workspaceSlug={workspaceSlug}
         language="fr-FR"
         anchorRect={anchorRect}
       />

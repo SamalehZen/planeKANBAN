@@ -196,7 +196,6 @@ export const RichTextEditor = forwardRef(function RichTextEditor(
           setCurrentNodeInfo(null);
         }}
         onResult={handleVoiceResult}
-        workspaceSlug={workspaceSlug}
         language="fr-FR"
       />
     </>

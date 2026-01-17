@@ -377,7 +377,6 @@ export const PageEditorBody = observer(function PageEditorBody(props: Props) {
           setCurrentNodeInfo(null);
         }}
         onResult={handleVoiceResult}
-        workspaceSlug={workspaceSlug}
         language="fr-FR"
       />
     </>
