@@ -144,6 +144,13 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
   const transcriptRef = useRef("");
 
   const fetchLLMConfig = useCallback(async () => {
+    if (!workspaceSlug) {
+      console.error("[Voice] No workspaceSlug provided");
+      setErrorMsg("Workspace non défini");
+      setState("error");
+      return;
+    }
+
     if (llmConfigCache[workspaceSlug]) {
       setLlmConfig(llmConfigCache[workspaceSlug]);
       setState("menu");
@@ -151,26 +158,49 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
     }
 
     try {
-      const response = await fetch(`/api/workspaces/${workspaceSlug}/llm-config/`, {
+      const url = `/api/workspaces/${workspaceSlug}/llm-config/`;
+      console.log("[Voice] Fetching LLM config from:", url);
+      
+      const response = await fetch(url, {
         method: "GET",
         credentials: "include",
         headers: {
+          "Accept": "application/json",
           "Content-Type": "application/json",
         },
       });
 
+      console.log("[Voice] Response status:", response.status, response.statusText);
+      const contentType = response.headers.get("content-type");
+      console.log("[Voice] Content-Type:", contentType);
+
+      const text = await response.text();
+      console.log("[Voice] Raw response:", text.substring(0, 200));
+
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "LLM non configuré");
+        let errorMsg = "LLM non configuré";
+        if (contentType?.includes("application/json")) {
+          try {
+            const error = JSON.parse(text);
+            errorMsg = error.error || error.detail || errorMsg;
+          } catch {
+            errorMsg = text || errorMsg;
+          }
+        } else {
+          errorMsg = `Erreur ${response.status}: ${response.statusText}`;
+        }
+        throw new Error(errorMsg);
       }
 
-      const config: LLMConfig = await response.json();
+      const config: LLMConfig = JSON.parse(text);
+      console.log("[Voice] LLM config received, provider:", config.provider, "model:", config.model);
       llmConfigCache[workspaceSlug] = config;
       setLlmConfig(config);
       setState("menu");
     } catch (err) {
-      console.error("Failed to fetch LLM config:", err);
-      setErrorMsg(err instanceof Error ? err.message : "LLM non configuré dans admin");
+      console.error("[Voice] Failed to fetch LLM config:", err);
+      const msg = err instanceof Error ? err.message : "Erreur inconnue";
+      setErrorMsg(msg);
       setState("error");
     }
   }, [workspaceSlug]);
