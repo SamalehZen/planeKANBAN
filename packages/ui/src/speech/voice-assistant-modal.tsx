@@ -87,6 +87,7 @@ export interface VoiceAssistantModalProps {
   onClose: () => void;
   onResult: (text: string) => void;
   geminiApiKey?: string;
+  geminiModel?: string;
   language?: string;
   anchorRect?: DOMRect | null;
 }
@@ -96,6 +97,7 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
   onClose,
   onResult,
   geminiApiKey,
+  geminiModel = "gemini-2.0-flash",
   language = "fr-FR",
   anchorRect,
 }) => {
@@ -128,7 +130,7 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
       if (mode === "voice" || !geminiApiKey) return { result: text };
 
       const genAI = new GoogleGenerativeAI(geminiApiKey);
-      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+      const model = genAI.getGenerativeModel({ model: geminiModel });
       const r = await model.generateContent(`${PROMPTS[mode]}\n\nTexte:"${text}"`);
       const res = r.response.text();
 
