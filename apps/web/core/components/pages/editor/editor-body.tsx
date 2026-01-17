@@ -63,7 +63,6 @@ type Props = {
   extendedEditorProps: TExtendedEditorExtensionsConfig;
   isFetchingFallbackBinary?: boolean;
   onCollaborationStateChange?: (state: CollaborationState) => void;
-  geminiApiKey?: string;
 };
 
 export const PageEditorBody = observer(function PageEditorBody(props: Props) {
@@ -82,7 +81,6 @@ export const PageEditorBody = observer(function PageEditorBody(props: Props) {
     extendedEditorProps,
     isFetchingFallbackBinary,
     onCollaborationStateChange,
-    geminiApiKey,
   } = props;
 
   const titleEditorRef = useRef<EditorTitleRefApi>(null);
@@ -379,7 +377,7 @@ export const PageEditorBody = observer(function PageEditorBody(props: Props) {
           setCurrentNodeInfo(null);
         }}
         onResult={handleVoiceResult}
-        geminiApiKey={geminiApiKey}
+        workspaceSlug={workspaceSlug}
         language="fr-FR"
       />
     </>

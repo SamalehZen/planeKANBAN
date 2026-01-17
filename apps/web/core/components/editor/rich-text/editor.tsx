@@ -20,8 +20,7 @@ type RichTextEditorWrapperProps = MakeOptional<
   workspaceId: string;
   projectId?: string;
   issueSequenceId?: number;
-  geminiApiKey?: string;
-} & (
+  } & (
     | {
         editable: false;
       }
@@ -44,7 +43,6 @@ export const RichTextEditor = forwardRef(function RichTextEditor(
     workspaceId,
     projectId,
     disabledExtensions: additionalDisabledExtensions = [],
-    geminiApiKey,
     ...rest
   } = props;
 
@@ -198,7 +196,7 @@ export const RichTextEditor = forwardRef(function RichTextEditor(
           setCurrentNodeInfo(null);
         }}
         onResult={handleVoiceResult}
-        geminiApiKey={geminiApiKey}
+        workspaceSlug={workspaceSlug}
         language="fr-FR"
       />
     </>

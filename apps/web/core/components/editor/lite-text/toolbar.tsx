@@ -24,8 +24,7 @@ type Props = {
   submitButtonText?: string;
   workspaceSlug?: string;
   speechEnabled?: boolean;
-  geminiApiKey?: string;
-};
+  };
 
 type TCommentAccessType = {
   icon: LucideIcon;
@@ -63,8 +62,7 @@ export function IssueCommentToolbar(props: Props) {
     submitButtonText = "common.comment",
     workspaceSlug,
     speechEnabled = true,
-    geminiApiKey,
-  } = props;
+    } = props;
 
   const [activeStates, setActiveStates] = useState<Record<string, boolean>>({});
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
@@ -221,7 +219,7 @@ export function IssueCommentToolbar(props: Props) {
         isOpen={isVoiceModalOpen}
         onClose={() => setIsVoiceModalOpen(false)}
         onResult={handleVoiceResult}
-        geminiApiKey={geminiApiKey}
+        workspaceSlug={workspaceSlug}
         language="fr-FR"
         anchorRect={anchorRect}
       />

@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Mic, MicOff, Check, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { cn } from "../utils";
 
 export type ProcessingMode = "auto" | "email" | "prompt" | "message" | "note" | "voice" | "document" | "planning";
@@ -60,13 +59,13 @@ const MODE_OPTIONS: { id: ProcessingMode; label: string; icon: string }[] = [
 ];
 
 const PROMPTS: Record<string, string> = {
-  auto: `Détecte et traite. JSON: {"detectedMode":"email|prompt|message|note|document|planning","result":"..."}`,
-  email: `Email pro: objet, intro, corps, politesse.`,
-  prompt: `Prompt optimisé pour LLM.`,
-  message: `Corrige orthographe sans changer le sens.`,
-  note: `Liste tâches avec ☐.`,
-  document: `Document: titre, sections.`,
-  planning: `Planning par date/heure.`,
+  auto: `Détecte le type de contenu et traite-le. Réponds uniquement avec le texte traité, sans explication.`,
+  email: `Transforme ce texte en email professionnel avec: objet, introduction, corps, formule de politesse. Réponds uniquement avec l'email formaté.`,
+  prompt: `Optimise ce texte en prompt efficace pour un LLM. Réponds uniquement avec le prompt optimisé.`,
+  message: `Corrige l'orthographe et la grammaire sans changer le sens. Réponds uniquement avec le texte corrigé.`,
+  note: `Transforme en liste de tâches avec ☐ devant chaque élément. Réponds uniquement avec la liste.`,
+  document: `Structure ce texte en document avec titre et sections. Réponds uniquement avec le document formaté.`,
+  planning: `Organise ce texte en planning par date/heure. Réponds uniquement avec le planning.`,
 };
 
 const AudioVisualizer = () => (
@@ -86,8 +85,7 @@ export interface VoiceAssistantModalProps {
   isOpen: boolean;
   onClose: () => void;
   onResult: (text: string) => void;
-  geminiApiKey?: string;
-  geminiModel?: string;
+  workspaceSlug?: string;
   language?: string;
   anchorRect?: DOMRect | null;
 }
@@ -96,8 +94,7 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
   isOpen,
   onClose,
   onResult,
-  geminiApiKey,
-  geminiModel = "gemini-2.0-flash",
+  workspaceSlug,
   language = "fr-FR",
   anchorRect,
 }) => {
@@ -125,26 +122,32 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
     return () => clearInterval(i);
   }, [state]);
 
-  const processWithGemini = useCallback(
+  const processWithBackendAI = useCallback(
     async (text: string, mode: ProcessingMode) => {
-      if (mode === "voice" || !geminiApiKey) return { result: text };
+      if (mode === "voice" || !workspaceSlug) return { result: text };
 
-      const genAI = new GoogleGenerativeAI(geminiApiKey);
-      const model = genAI.getGenerativeModel({ model: geminiModel });
-      const r = await model.generateContent(`${PROMPTS[mode]}\n\nTexte:"${text}"`);
-      const res = r.response.text();
+      const prompt = `${PROMPTS[mode]}\n\nTexte à traiter:\n"${text}"`;
 
-      if (mode === "auto") {
-        try {
-          const p = JSON.parse(res.replace(/```json\n?|\n?```/g, "").trim());
-          return { result: p.result, detectedMode: p.detectedMode };
-        } catch {
-          return { result: res };
-        }
+      const response = await fetch(`/api/workspaces/${workspaceSlug}/ai-assistant/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          prompt,
+          task: "voice_processing",
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Erreur lors du traitement IA");
       }
-      return { result: res };
+
+      const data = await response.json();
+      return { result: data.response || text };
     },
-    [geminiApiKey]
+    [workspaceSlug]
   );
 
   const startRecording = useCallback(
@@ -220,7 +223,7 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
     setState("processing");
 
     try {
-      const { result } = await processWithGemini(transcript, selectedMode);
+      const { result } = await processWithBackendAI(transcript, selectedMode);
 
       setState("result");
 
@@ -230,10 +233,10 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
       }, 800);
     } catch (err) {
       console.error(err);
-      setErrorMsg(err instanceof Error ? err.message : "Erreur Gemini");
+      setErrorMsg(err instanceof Error ? err.message : "Erreur de traitement");
       setState("error");
     }
-  }, [selectedMode, processWithGemini, onResult, onClose]);
+  }, [selectedMode, processWithBackendAI, onResult, onClose]);
 
   const handleClose = useCallback(() => {
     if (recognitionRef.current) {
@@ -411,10 +414,8 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                 )}
               </AnimatePresence>
 
-              {!geminiApiKey && state === "menu" && (
-                <p className="text-xs text-amber-500 mt-3 text-center">
-                  ⚠️ Clé Gemini non configurée - Mode texte brut
-                </p>
+              {!workspaceSlug && state === "menu" && (
+                <p className="text-xs text-amber-500 mt-3 text-center">⚠️ Workspace non défini - Mode texte brut</p>
               )}
             </div>
           </div>
