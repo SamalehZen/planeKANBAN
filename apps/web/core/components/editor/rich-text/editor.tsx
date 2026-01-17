@@ -197,6 +197,7 @@ export const RichTextEditor = forwardRef(function RichTextEditor(
         }}
         onResult={handleVoiceResult}
         language="fr-FR"
+        workspaceSlug={workspaceSlug}
       />
     </>
   );

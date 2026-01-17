@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Mic, MicOff, Check, X, Settings } from "lucide-react";
+import { Mic, MicOff, Check, X, AlertCircle, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { cn } from "../utils";
 
 export type ProcessingMode = "auto" | "email" | "prompt" | "message" | "note" | "voice" | "document" | "planning";
-type VoiceState = "idle" | "menu" | "listening" | "processing" | "result" | "error" | "settings";
+type VoiceState = "idle" | "loading" | "menu" | "listening" | "processing" | "result" | "error";
 
 interface SpeechRecognitionEvent {
   results: SpeechRecognitionResultList;
@@ -69,7 +69,11 @@ const PROMPTS: Record<string, string> = {
   planning: `Planning par date/heure. Réponds uniquement avec le planning.`,
 };
 
-const STORAGE_KEY = "plane_voice_gemini_key";
+interface LLMConfig {
+  api_key: string;
+  model: string;
+  provider: string;
+}
 
 const AudioVisualizer = () => (
   <div className="flex items-center justify-center gap-[2px] h-8">
@@ -90,7 +94,10 @@ export interface VoiceAssistantModalProps {
   onResult: (text: string) => void;
   language?: string;
   anchorRect?: DOMRect | null;
+  workspaceSlug: string;
 }
+
+const llmConfigCache: { [slug: string]: LLMConfig } = {};
 
 export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
   isOpen,
@@ -98,34 +105,64 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
   onResult,
   language = "fr-FR",
   anchorRect,
+  workspaceSlug,
 }) => {
-  const [state, setState] = useState<VoiceState>("menu");
+  const [state, setState] = useState<VoiceState>("loading");
   const [selectedMode, setSelectedMode] = useState<ProcessingMode>("auto");
   const [timer, setTimer] = useState(0);
   const [liveText, setLiveText] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
-  const [apiKey, setApiKey] = useState("");
-  const [tempApiKey, setTempApiKey] = useState("");
+  const [llmConfig, setLlmConfig] = useState<LLMConfig | null>(null);
 
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const transcriptRef = useRef("");
 
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      setApiKey(saved);
-      setTempApiKey(saved);
+  const fetchLLMConfig = useCallback(async () => {
+    if (llmConfigCache[workspaceSlug]) {
+      setLlmConfig(llmConfigCache[workspaceSlug]);
+      setState("menu");
+      return;
     }
-  }, []);
+
+    try {
+      const response = await fetch(`/api/v1/workspaces/${workspaceSlug}/llm-config/`, {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "LLM non configuré");
+      }
+
+      const config: LLMConfig = await response.json();
+      llmConfigCache[workspaceSlug] = config;
+      setLlmConfig(config);
+      setState("menu");
+    } catch (err) {
+      console.error("Failed to fetch LLM config:", err);
+      setErrorMsg(err instanceof Error ? err.message : "LLM non configuré dans admin");
+      setState("error");
+    }
+  }, [workspaceSlug]);
 
   useEffect(() => {
     if (isOpen) {
-      setState(apiKey ? "menu" : "settings");
       setLiveText("");
       setErrorMsg("");
       setTimer(0);
+      
+      if (llmConfig) {
+        setState("menu");
+      } else {
+        setState("loading");
+        fetchLLMConfig();
+      }
     }
-  }, [isOpen, apiKey]);
+  }, [isOpen, llmConfig, fetchLLMConfig]);
 
   useEffect(() => {
     let i: ReturnType<typeof setInterval>;
@@ -133,24 +170,16 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
     return () => clearInterval(i);
   }, [state]);
 
-  const saveApiKey = useCallback(() => {
-    if (tempApiKey.trim()) {
-      localStorage.setItem(STORAGE_KEY, tempApiKey.trim());
-      setApiKey(tempApiKey.trim());
-      setState("menu");
-    }
-  }, [tempApiKey]);
-
   const processWithGemini = useCallback(
     async (text: string, mode: ProcessingMode) => {
-      if (mode === "voice" || !apiKey) return { result: text };
+      if (mode === "voice" || !llmConfig) return { result: text };
 
-      const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
+      const genAI = new GoogleGenerativeAI(llmConfig.api_key);
+      const model = genAI.getGenerativeModel({ model: llmConfig.model });
       const r = await model.generateContent(`${PROMPTS[mode]}\n\nTexte:"${text}"`);
       return { result: r.response.text() };
     },
-    [apiKey]
+    [llmConfig]
   );
 
   const startRecording = useCallback(
@@ -284,21 +313,24 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                   <div
                     className={cn("w-8 h-8 rounded-lg flex items-center justify-center", {
                       "bg-green-500/20": state === "result",
-                      "bg-custom-primary-100/20": state !== "result",
+                      "bg-red-500/20": state === "error",
+                      "bg-custom-primary-100/20": state !== "result" && state !== "error",
                     })}
                   >
                     {state === "result" ? (
                       <Check className="w-4 h-4 text-green-500" />
-                    ) : state === "settings" ? (
-                      <Settings className="w-4 h-4 text-custom-primary-100" />
+                    ) : state === "error" ? (
+                      <AlertCircle className="w-4 h-4 text-red-500" />
+                    ) : state === "loading" ? (
+                      <Loader2 className="w-4 h-4 text-custom-primary-100 animate-spin" />
                     ) : (
                       <Mic className="w-4 h-4 text-custom-primary-100" />
                     )}
                   </div>
                   <div>
                     <p className="text-sm font-medium text-custom-text-100">
+                      {state === "loading" && "Chargement..."}
                       {state === "menu" && "Choisir le mode"}
-                      {state === "settings" && "Configuration"}
                       {state === "listening" && `${Math.floor(timer / 60)}:${(timer % 60).toString().padStart(2, "0")}`}
                       {state === "processing" && "Traitement..."}
                       {state === "result" && "Terminé !"}
@@ -307,76 +339,33 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                     {state === "error" && <p className="text-xs text-red-400">{errorMsg}</p>}
                   </div>
                 </div>
-                <div className="flex items-center gap-1">
-                  {state === "menu" && (
-                    <button
-                      onClick={() => {
-                        setTempApiKey(apiKey);
-                        setState("settings");
-                      }}
-                      className="p-1.5 rounded-lg hover:bg-custom-background-80 transition-colors"
-                    >
-                      <Settings className="w-4 h-4 text-custom-text-300" />
-                    </button>
-                  )}
-                  <button
-                    onClick={handleClose}
-                    className="p-1.5 rounded-lg hover:bg-custom-background-80 transition-colors"
-                  >
-                    <X className="w-4 h-4 text-custom-text-300" />
-                  </button>
-                </div>
+                <button
+                  onClick={handleClose}
+                  className="p-1.5 rounded-lg hover:bg-custom-background-80 transition-colors"
+                >
+                  <X className="w-4 h-4 text-custom-text-300" />
+                </button>
               </div>
 
               <AnimatePresence mode="wait">
-                {state === "settings" && (
+                {state === "loading" && (
                   <motion.div
-                    key="settings"
+                    key="loading"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="space-y-3"
+                    className="py-8 flex justify-center"
                   >
-                    <div>
-                      <label className="block text-xs font-medium text-custom-text-300 mb-1.5">
-                        Clé API Gemini
-                      </label>
-                      <input
-                        type="password"
-                        value={tempApiKey}
-                        onChange={(e) => setTempApiKey(e.target.value)}
-                        placeholder="AIza..."
-                        className="w-full px-3 py-2 rounded-lg border border-custom-border-200 bg-custom-background-90 text-custom-text-100 text-sm placeholder:text-custom-text-400 focus:outline-none focus:ring-2 focus:ring-custom-primary-100"
-                      />
-                      <p className="text-[10px] text-custom-text-400 mt-1">
-                        Appel direct = plus rapide (~2 sec)
-                      </p>
+                    <div className="flex gap-1">
+                      {[0, 1, 2].map((i) => (
+                        <motion.div
+                          key={i}
+                          className="w-2.5 h-2.5 rounded-full bg-custom-primary-100"
+                          animate={{ y: [0, -8, 0] }}
+                          transition={{ duration: 0.4, repeat: Infinity, delay: i * 0.1 }}
+                        />
+                      ))}
                     </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={saveApiKey}
-                        disabled={!tempApiKey.trim()}
-                        className="flex-1 px-3 py-2 rounded-lg text-sm font-medium bg-custom-primary-100 text-white hover:bg-custom-primary-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                      >
-                        Sauvegarder
-                      </button>
-                      {apiKey && (
-                        <button
-                          onClick={() => setState("menu")}
-                          className="px-3 py-2 rounded-lg text-sm bg-custom-background-80 text-custom-text-200 hover:bg-custom-background-90 transition-colors"
-                        >
-                          Annuler
-                        </button>
-                      )}
-                    </div>
-                    <a
-                      href="https://aistudio.google.com/apikey"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block text-center text-xs text-custom-primary-100 hover:underline"
-                    >
-                      Obtenir une clé Gemini →
-                    </a>
                   </motion.div>
                 )}
 
@@ -470,10 +459,17 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                     key="error"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="py-4 text-center"
+                    className="py-4 text-center space-y-3"
                   >
+                    <p className="text-xs text-custom-text-300">
+                      Configurez le LLM dans l'administration
+                    </p>
                     <button
-                      onClick={() => setState("menu")}
+                      onClick={() => {
+                        setLlmConfig(null);
+                        delete llmConfigCache[workspaceSlug];
+                        fetchLLMConfig();
+                      }}
                       className="px-6 py-2.5 rounded-xl text-sm bg-custom-background-80 text-custom-text-100 hover:bg-custom-background-90 transition-colors"
                     >
                       Réessayer

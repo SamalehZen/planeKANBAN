@@ -183,7 +183,7 @@ from .external.base import (
     UnsplashEndpoint,
     WorkspaceGPTIntegrationEndpoint,
 )
-from .external.speech import AssemblyAITokenEndpoint
+from .external.speech import AssemblyAITokenEndpoint, LLMConfigEndpoint
 from .estimate.base import (
     ProjectEstimatePointEndpoint,
     BulkEstimatePointEndpoint,
