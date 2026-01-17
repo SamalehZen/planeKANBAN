@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { MicOff, Check, X, Sparkles, Loader2 } from 'lucide-react';
+import { MicOff, Check, X, Sparkles, Loader2, Key } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 export type ProcessingMode = 'auto' | 'email' | 'prompt' | 'message' | 'note' | 'voice' | 'document' | 'planning';
-type VoiceState = 'idle' | 'loading' | 'menu' | 'listening' | 'processing' | 'result' | 'error';
+type VoiceState = 'idle' | 'settings' | 'menu' | 'listening' | 'processing' | 'result' | 'error';
 
 interface SpeechRecognitionEvent {
   results: SpeechRecognitionResultList;
@@ -47,6 +47,8 @@ declare global {
   }
 }
 
+const STORAGE_KEY = 'plane_voice_gemini_key';
+
 const MODE_OPTIONS: { id: ProcessingMode; label: string; icon: string }[] = [
   { id: 'auto', label: 'Auto', icon: '✨' },
   { id: 'email', label: 'Email', icon: '📧' },
@@ -67,12 +69,6 @@ const PROMPTS: Record<string, string> = {
   document: `Document: titre, sections. Réponds uniquement avec le document.`,
   planning: `Planning par date/heure. Réponds uniquement avec le planning.`,
 };
-
-interface LLMConfig {
-  api_key: string;
-  model: string;
-  provider: string;
-}
 
 const useThemeDetector = () => {
   const [isDark, setIsDark] = useState(true);
@@ -212,101 +208,40 @@ export interface VoiceAssistantModalProps {
   workspaceSlug: string;
 }
 
-const llmConfigCache: { [slug: string]: LLMConfig } = {};
-
 export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
   isOpen,
   onClose,
   onResult,
   language = "fr-FR",
-  workspaceSlug,
 }) => {
   const isDark = useThemeDetector();
-  const [state, setState] = useState<VoiceState>("loading");
+  const [state, setState] = useState<VoiceState>("settings");
   const [selectedMode, setSelectedMode] = useState<ProcessingMode>("auto");
   const [timer, setTimer] = useState(0);
   const [liveText, setLiveText] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
-  const [llmConfig, setLlmConfig] = useState<LLMConfig | null>(null);
+  const [apiKey, setApiKey] = useState("");
+  const [tempApiKey, setTempApiKey] = useState("");
 
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const transcriptRef = useRef("");
 
-  const fetchLLMConfig = useCallback(async () => {
-    if (!workspaceSlug) {
-      console.error("[Voice] No workspaceSlug provided");
-      setErrorMsg("Workspace non défini");
-      setState("error");
-      return;
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      setApiKey(saved);
+      setTempApiKey(saved);
     }
-
-    if (llmConfigCache[workspaceSlug]) {
-      setLlmConfig(llmConfigCache[workspaceSlug]);
-      setState("menu");
-      return;
-    }
-
-    try {
-      const url = `/api/workspaces/${workspaceSlug}/llm-config/`;
-      console.log("[Voice] Fetching LLM config from:", url);
-      
-      const response = await fetch(url, {
-        method: "GET",
-        credentials: "include",
-        headers: {
-          "Accept": "application/json",
-          "Content-Type": "application/json",
-        },
-      });
-
-      console.log("[Voice] Response status:", response.status, response.statusText);
-
-      const text = await response.text();
-      console.log("[Voice] Raw response:", text.substring(0, 200));
-
-      if (!response.ok) {
-        const contentType = response.headers.get("content-type");
-        let errMsg = "LLM non configuré";
-        if (contentType?.includes("application/json")) {
-          try {
-            const error = JSON.parse(text);
-            errMsg = error.error || error.detail || errMsg;
-          } catch {
-            errMsg = text || errMsg;
-          }
-        } else {
-          errMsg = `Erreur ${response.status}: ${response.statusText}`;
-        }
-        throw new Error(errMsg);
-      }
-
-      const config: LLMConfig = JSON.parse(text);
-      console.log("[Voice] LLM config received, provider:", config.provider, "model:", config.model);
-      llmConfigCache[workspaceSlug] = config;
-      setLlmConfig(config);
-      setState("menu");
-    } catch (err) {
-      console.error("[Voice] Failed to fetch LLM config:", err);
-      const msg = err instanceof Error ? err.message : "Erreur inconnue";
-      setErrorMsg(msg);
-      setState("error");
-    }
-  }, [workspaceSlug]);
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
       setLiveText("");
       setErrorMsg("");
       setTimer(0);
-      
-      if (llmConfig) {
-        setState("menu");
-      } else {
-        setState("loading");
-        fetchLLMConfig();
-      }
+      setState(apiKey ? "menu" : "settings");
     }
-  }, [isOpen, llmConfig, fetchLLMConfig]);
+  }, [isOpen, apiKey]);
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
@@ -322,14 +257,22 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
     };
   }, []);
 
+  const saveApiKey = useCallback(() => {
+    if (tempApiKey.trim()) {
+      localStorage.setItem(STORAGE_KEY, tempApiKey.trim());
+      setApiKey(tempApiKey.trim());
+      setState("menu");
+    }
+  }, [tempApiKey]);
+
   const processWithGemini = useCallback(async (text: string, mode: ProcessingMode) => {
-    if (mode === 'voice' || !llmConfig) return { result: text };
+    if (mode === 'voice' || !apiKey) return { result: text };
     
-    const genAI = new GoogleGenerativeAI(llmConfig.api_key);
-    const model = genAI.getGenerativeModel({ model: llmConfig.model });
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
     const r = await model.generateContent(`${PROMPTS[mode]}\n\nTexte:"${text}"`);
     return { result: r.response.text() };
-  }, [llmConfig]);
+  }, [apiKey]);
 
   const startRecording = useCallback((mode: ProcessingMode) => {
     const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -445,7 +388,7 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                   <motion.div 
                     layoutId="status-icon"
                     className={`flex items-center justify-center w-10 h-10 rounded-full shadow-inner ${
-                      state === 'listening' ? "bg-red-500/10" : isDark ? "bg-white/10" : "bg-black/5"
+                      state === 'listening' ? "bg-red-500/10" : state === 'settings' ? "bg-amber-500/10" : isDark ? "bg-white/10" : "bg-black/5"
                     }`}
                   >
                     {state === 'listening' ? (
@@ -454,8 +397,8 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                         transition={{ repeat: Infinity, duration: 2 }}
                         className="w-3 h-3 bg-red-500 rounded-full shadow-[0_0_12px_rgba(239,68,68,0.8)]" 
                       />
-                    ) : state === 'loading' ? (
-                      <Loader2 className={`w-5 h-5 animate-spin ${isDark ? "text-white" : "text-black"}`} />
+                    ) : state === 'settings' ? (
+                      <Key className={`w-5 h-5 ${isDark ? "text-amber-400" : "text-amber-600"}`} />
                     ) : (
                       <Sparkles className={`w-5 h-5 ${isDark ? "text-white" : "text-black"}`} />
                     )}
@@ -466,7 +409,7 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                       layout
                       className={`text-sm font-semibold tracking-wide ${isDark ? "text-white" : "text-slate-900"}`}
                     >
-                      {state === 'loading' && 'Chargement'}
+                      {state === 'settings' && 'Configuration'}
                       {state === 'listening' && 'En écoute'}
                       {state === 'processing' && 'Traitement IA'}
                       {state === 'result' && 'Terminé'}
@@ -477,7 +420,7 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                       initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                       className={`text-[11px] font-medium uppercase tracking-wider opacity-60 ${isDark ? "text-white" : "text-slate-900"}`}
                     >
-                      {state === 'listening' ? formatTimer(timer) : state === 'menu' ? 'Sélectionner mode' : state === 'loading' ? 'Configuration...' : '...'}
+                      {state === 'listening' ? formatTimer(timer) : state === 'menu' ? 'Sélectionner mode' : state === 'settings' ? 'Clé API requise' : '...'}
                     </motion.span>
                   </div>
                 </div>
@@ -493,18 +436,58 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
               </div>
 
               <AnimatePresence mode="wait">
-                {state === 'loading' && (
+                {state === 'settings' && (
                   <motion.div 
-                    key="loading"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="py-8 flex flex-col items-center"
+                    key="settings"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="space-y-4"
                   >
-                    <LoadingOrb isDark={isDark} />
-                    <span className={`text-xs mt-4 opacity-50 ${isDark ? "text-white" : "text-black"}`}>
-                      Connexion au serveur...
-                    </span>
+                    <div>
+                      <label className={`block text-xs font-medium mb-2 ${isDark ? "text-white/60" : "text-slate-500"}`}>
+                        Clé API Google Gemini
+                      </label>
+                      <input
+                        type="password"
+                        value={tempApiKey}
+                        onChange={(e) => setTempApiKey(e.target.value)}
+                        placeholder="AIza..."
+                        className={`w-full px-4 py-3 rounded-2xl border text-sm transition-all ${
+                          isDark 
+                            ? "bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-white/30" 
+                            : "bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-slate-400"
+                        } focus:outline-none`}
+                      />
+                      <p className={`text-[10px] mt-2 ${isDark ? "text-white/40" : "text-slate-400"}`}>
+                        Votre clé est stockée localement sur votre navigateur
+                      </p>
+                    </div>
+                    
+                    <button
+                      onClick={saveApiKey}
+                      disabled={!tempApiKey.trim()}
+                      className={`w-full py-3 rounded-2xl text-sm font-semibold transition-all ${
+                        tempApiKey.trim()
+                          ? isDark 
+                            ? "bg-white text-black hover:bg-white/90" 
+                            : "bg-indigo-600 text-white hover:bg-indigo-700"
+                          : isDark
+                            ? "bg-white/10 text-white/30 cursor-not-allowed"
+                            : "bg-slate-100 text-slate-400 cursor-not-allowed"
+                      }`}
+                    >
+                      Continuer
+                    </button>
+
+                    <a 
+                      href="https://aistudio.google.com/apikey" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className={`block text-center text-xs ${isDark ? "text-indigo-400" : "text-indigo-600"} hover:underline`}
+                    >
+                      Obtenir une clé API gratuite →
+                    </a>
                   </motion.div>
                 )}
 
@@ -598,11 +581,7 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                   <motion.div key="error" className="py-4 flex flex-col items-center text-center px-4">
                      <p className="text-red-500 text-sm mb-4 font-medium">{errorMsg}</p>
                      <button 
-                       onClick={() => {
-                         setLlmConfig(null);
-                         delete llmConfigCache[workspaceSlug];
-                         fetchLLMConfig();
-                       }} 
+                       onClick={() => setState(apiKey ? 'menu' : 'settings')} 
                        className={`px-4 py-2 rounded-full text-xs font-semibold ${isDark ? "bg-white/10 text-white" : "bg-black/5 text-black"}`}
                      >
                        Réessayer
