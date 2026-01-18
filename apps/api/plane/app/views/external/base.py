@@ -198,7 +198,7 @@ class GPTIntegrationEndpoint(BaseAPIView):
 
         if not api_key or not model or not provider:
             return Response(
-                {"error": "LLM provider API key and model are required"},
+                {"error": "Configuration AI manquante. Veuillez configurer l'API key MiMo dans Admin > AI Settings."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -234,7 +234,7 @@ class WorkspaceGPTIntegrationEndpoint(BaseAPIView):
 
         if not api_key or not model or not provider:
             return Response(
-                {"error": "LLM provider API key and model are required"},
+                {"error": "Configuration AI manquante. Veuillez configurer l'API key MiMo dans Admin > AI Settings."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

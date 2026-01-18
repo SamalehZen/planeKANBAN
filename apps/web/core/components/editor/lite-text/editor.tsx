@@ -5,6 +5,7 @@ import { AI_EDITOR_TASKS, type EIssueCommentAccessSpecifier } from "@plane/const
 import { LiteTextEditorWithRef } from "@plane/editor";
 import type { EditorRefApi, ILiteTextEditorProps, TAIActionPayload, TFileHandler } from "@plane/editor";
 import { useTranslation } from "@plane/i18n";
+import { TOAST_TYPE, setToast } from "@plane/propel/toast";
 import type { MakeOptional } from "@plane/types";
 import { cn, isCommentEmpty } from "@plane/utils";
 // components
@@ -146,8 +147,22 @@ export const LiteTextEditor = React.forwardRef(function LiteTextEditor(
           task: payload.task,
         });
         return result?.response || null;
-      } catch (error) {
+      } catch (error: any) {
         console.error("AI action failed:", error);
+        const errMsg = error?.data?.error || "Erreur IA";
+        if (errMsg.includes("API key") || errMsg.includes("Configuration AI")) {
+          setToast({
+            type: TOAST_TYPE.ERROR,
+            title: "Erreur!",
+            message: "Clé API non configurée. Allez dans Admin > AI Settings pour configurer MiMo.",
+          });
+        } else {
+          setToast({
+            type: TOAST_TYPE.ERROR,
+            title: "Erreur!",
+            message: errMsg,
+          });
+        }
         return null;
       }
     },
