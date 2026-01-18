@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { MicOff, Check, X, Sparkles, Loader2, Key } from 'lucide-react';
+import { MicOff, Check, X, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 
 export type ProcessingMode = 'auto' | 'email' | 'prompt' | 'message' | 'note' | 'voice' | 'document' | 'planning';
-type VoiceState = 'idle' | 'settings' | 'menu' | 'listening' | 'processing' | 'result' | 'error';
+type VoiceState = 'idle' | 'menu' | 'listening' | 'processing' | 'result' | 'error';
 
 interface SpeechRecognitionEvent {
   results: SpeechRecognitionResultList;
@@ -47,7 +46,6 @@ declare global {
   }
 }
 
-const STORAGE_KEY = 'plane_voice_gemini_key';
 const STORAGE_MODE_KEY = 'plane_voice_last_mode';
 
 const MODE_OPTIONS: { id: ProcessingMode; label: string; icon: string }[] = [
@@ -251,9 +249,10 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
   onClose,
   onResult,
   language = "fr-FR",
+  workspaceSlug,
 }) => {
   const isDark = useThemeDetector();
-  const [state, setState] = useState<VoiceState>("settings");
+  const [state, setState] = useState<VoiceState>("menu");
   const [selectedMode, setSelectedMode] = useState<ProcessingMode>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem(STORAGE_MODE_KEY);
@@ -266,20 +265,10 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
   const [timer, setTimer] = useState(0);
   const [liveText, setLiveText] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
-  const [apiKey, setApiKey] = useState("");
-  const [tempApiKey, setTempApiKey] = useState("");
 
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const transcriptRef = useRef("");
   const liveTextRef = useRef("");
-
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      setApiKey(saved);
-      setTempApiKey(saved);
-    }
-  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -304,32 +293,39 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
     };
   }, []);
 
-  const saveApiKey = useCallback(() => {
-    if (tempApiKey.trim()) {
-      localStorage.setItem(STORAGE_KEY, tempApiKey.trim());
-      setApiKey(tempApiKey.trim());
-      setState("menu");
-    }
-  }, [tempApiKey]);
-
-  const processWithGemini = useCallback(async (text: string, mode: ProcessingMode) => {
-    if (mode === 'voice' || !apiKey) return { result: text };
+  const processWithBackend = useCallback(async (text: string, mode: ProcessingMode) => {
+    if (mode === 'voice') return { result: text };
     
     try {
-      const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-      const r = await model.generateContent(`${PROMPTS[mode]}\n\nTexte:"${text}"`);
-      const responseText = r.response.text();
-      if (!responseText || responseText.trim() === '') {
-        console.warn('[Gemini] Empty response, returning original text');
+      const prompt = `${PROMPTS[mode]}\n\nTexte:"${text}"`;
+      const response = await fetch(`/api/workspaces/${workspaceSlug}/ai-assistant/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          task: 'voice_assistant',
+          prompt: prompt,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Erreur serveur');
+      }
+
+      const data = await response.json();
+      if (!data.response || data.response.trim() === '') {
+        console.warn('[Backend] Empty response, returning original text');
         return { result: text };
       }
-      return { result: responseText };
+      return { result: data.response };
     } catch (error) {
-      console.error('[Gemini] Processing error:', error);
-      return { result: text };
+      console.error('[Backend] Processing error:', error);
+      throw error;
     }
-  }, [apiKey]);
+  }, [workspaceSlug]);
 
   const startRecording = useCallback((mode: ProcessingMode) => {
     const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -417,7 +413,7 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
     await new Promise(resolve => setTimeout(resolve, 150));
 
     const transcript = transcriptRef.current.trim() || liveTextRef.current.trim() || liveText.trim();
-    console.log('[Speech] Final transcript:', transcript, 'transcriptRef:', transcriptRef.current, 'liveTextRef:', liveTextRef.current);
+    console.log('[Speech] Final transcript:', transcript);
     
     if (!transcript) {
       setState('menu');
@@ -442,7 +438,7 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
     setState('processing');
 
     try {
-      const { result } = await processWithGemini(transcript, selectedMode);
+      const { result } = await processWithBackend(transcript, selectedMode);
       if (result && result.trim()) {
         console.log('[Voice] AI mode - calling onResult with:', result.substring(0, 100));
         setState('result');
@@ -465,7 +461,7 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
       setErrorMsg(msg);
       setState('error');
     }
-  }, [selectedMode, processWithGemini, onResult, onClose, liveText]);
+  }, [selectedMode, processWithBackend, onResult, onClose, liveText]);
 
   const handleClose = useCallback(() => {
     if (recognitionRef.current) {
@@ -497,15 +493,14 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.2 }}
-        className="fixed inset-0 z-[9999]"
-        onClick={handleClose}
+        className="fixed inset-0 z-[9999] pointer-events-none"
       >
         <motion.div
           initial={{ opacity: 0, scale: 0.8, y: -20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.85, y: -10 }}
           transition={dynamicIslandSpring}
-          className="fixed top-6 left-1/2 -translate-x-1/2 z-[10000] w-[360px]"
+          className="fixed top-6 left-1/2 -translate-x-1/2 z-[10000] w-[360px] pointer-events-auto"
           onClick={(e) => e.stopPropagation()}
         >
           <motion.div 
@@ -527,11 +522,9 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                     className={`flex items-center justify-center w-10 h-10 rounded-full ${
                       state === 'listening' 
                         ? "bg-red-500/10" 
-                        : state === 'settings' 
-                          ? "bg-amber-500/10" 
-                          : isDark 
-                            ? "bg-white/10" 
-                            : "bg-indigo-50 shadow-sm"
+                        : isDark 
+                          ? "bg-white/10" 
+                          : "bg-indigo-50 shadow-sm"
                     }`}
                   >
                     {state === 'listening' ? (
@@ -540,8 +533,6 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                         transition={{ repeat: Infinity, duration: 2 }}
                         className="w-3 h-3 bg-red-500 rounded-full shadow-[0_0_12px_rgba(239,68,68,0.8)]" 
                       />
-                    ) : state === 'settings' ? (
-                      <Key className={`w-5 h-5 ${isDark ? "text-amber-400" : "text-amber-600"}`} />
                     ) : (
                       <Sparkles className={`w-5 h-5 ${isDark ? "text-white" : "text-indigo-600"}`} />
                     )}
@@ -552,7 +543,6 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                       layout
                       className={`text-sm font-semibold tracking-wide ${isDark ? "text-white" : "text-slate-900"}`}
                     >
-                      {state === 'settings' && 'Configuration'}
                       {state === 'listening' && 'En écoute'}
                       {state === 'processing' && 'Traitement IA'}
                       {state === 'result' && 'Terminé'}
@@ -563,7 +553,7 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                       initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                       className={`text-[11px] font-medium uppercase tracking-wider opacity-60 ${isDark ? "text-white" : "text-slate-900"}`}
                     >
-                      {state === 'listening' ? formatTimer(timer) : state === 'menu' ? 'Sélectionner mode' : state === 'settings' ? 'Clé API requise' : '...'}
+                      {state === 'listening' ? formatTimer(timer) : state === 'menu' ? 'Sélectionner mode' : '...'}
                     </motion.span>
                   </div>
                 </div>
@@ -579,62 +569,6 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
               </div>
 
               <AnimatePresence mode="popLayout">
-                {state === 'settings' && (
-                  <motion.div 
-                    key="settings"
-                    initial={{ opacity: 0, filter: "blur(10px)" }}
-                    animate={{ opacity: 1, filter: "blur(0px)" }}
-                    exit={{ opacity: 0, filter: "blur(10px)" }}
-                    transition={{ duration: 0.25 }}
-                    className="space-y-4"
-                  >
-                    <div>
-                      <label className={`block text-xs font-medium mb-2 ${isDark ? "text-white/60" : "text-slate-500"}`}>
-                        Clé API Google Gemini
-                      </label>
-                      <input
-                        type="password"
-                        value={tempApiKey}
-                        onChange={(e) => setTempApiKey(e.target.value)}
-                        placeholder="AIza..."
-                        className={`w-full px-4 py-3 rounded-2xl border text-sm transition-all ${
-                          isDark 
-                            ? "bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-white/30" 
-                            : "bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-slate-400"
-                        } focus:outline-none`}
-                      />
-                      <p className={`text-[10px] mt-2 ${isDark ? "text-white/40" : "text-slate-400"}`}>
-                        Votre clé est stockée localement sur votre navigateur
-                      </p>
-                    </div>
-                    
-                    <button
-                      onClick={saveApiKey}
-                      disabled={!tempApiKey.trim()}
-                      className={`w-full py-3 rounded-2xl text-sm font-semibold transition-all ${
-                        tempApiKey.trim()
-                          ? isDark 
-                            ? "bg-white text-black hover:bg-white/90" 
-                            : "bg-indigo-600 text-white hover:bg-indigo-700"
-                          : isDark
-                            ? "bg-white/10 text-white/30 cursor-not-allowed"
-                            : "bg-slate-100 text-slate-400 cursor-not-allowed"
-                      }`}
-                    >
-                      Continuer
-                    </button>
-
-                    <a 
-                      href="https://aistudio.google.com/apikey" 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className={`block text-center text-xs ${isDark ? "text-indigo-400" : "text-indigo-600"} hover:underline`}
-                    >
-                      Obtenir une clé API gratuite →
-                    </a>
-                  </motion.div>
-                )}
-
                 {state === 'menu' && (
                   <motion.div 
                     key="menu"
@@ -645,50 +579,30 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                     className="space-y-3"
                   >
                     <div className="grid grid-cols-4 gap-3">
-                      {MODE_OPTIONS.map((mode, i) => {
-                        const needsApiKey = mode.id !== 'voice';
-                        const isDisabled = needsApiKey && !apiKey;
-                        
-                        return (
-                          <motion.button
-                            key={mode.id}
-                            initial={{ opacity: 0, scale: 0.8 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            transition={{ delay: i * 0.03 }}
-                            whileTap={{ scale: 0.92 }}
-                            onClick={() => !isDisabled && startRecording(mode.id)}
-                            disabled={isDisabled}
-                            className={`flex flex-col items-center gap-2 ${isDisabled ? 'opacity-40 cursor-not-allowed' : ''}`}
-                            title={isDisabled ? 'Clé API Gemini requise' : mode.label}
-                          >
-                            <div className={`w-14 h-14 rounded-[18px] flex items-center justify-center text-2xl transition-all shadow-sm border ${
-                              isDark 
-                                ? "bg-white/5 border-white/5 hover:bg-white/10" 
-                                : "bg-white border-slate-100 hover:bg-slate-50 hover:shadow-md"
-                            }`}>
-                              {mode.icon}
-                            </div>
-                            <span className={`text-[10px] font-medium opacity-70 ${isDark ? "text-white" : "text-slate-900"}`}>
-                              {mode.label}
-                            </span>
-                          </motion.button>
-                        );
-                      })}
+                      {MODE_OPTIONS.map((mode, i) => (
+                        <motion.button
+                          key={mode.id}
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ delay: i * 0.03 }}
+                          whileTap={{ scale: 0.92 }}
+                          onClick={() => startRecording(mode.id)}
+                          className="flex flex-col items-center gap-2"
+                          title={mode.label}
+                        >
+                          <div className={`w-14 h-14 rounded-[18px] flex items-center justify-center text-2xl transition-all shadow-sm border ${
+                            isDark 
+                              ? "bg-white/5 border-white/5 hover:bg-white/10" 
+                              : "bg-white border-slate-100 hover:bg-slate-50 hover:shadow-md"
+                          }`}>
+                            {mode.icon}
+                          </div>
+                          <span className={`text-[10px] font-medium opacity-70 ${isDark ? "text-white" : "text-slate-900"}`}>
+                            {mode.label}
+                          </span>
+                        </motion.button>
+                      ))}
                     </div>
-                    
-                    {!apiKey && (
-                      <button
-                        onClick={() => setState('settings')}
-                        className={`w-full py-2 text-xs font-medium rounded-xl transition-all ${
-                          isDark 
-                            ? "text-white/50 hover:text-white/80 hover:bg-white/5" 
-                            : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"
-                        }`}
-                      >
-                        <Key className="w-3 h-3 inline mr-1" />
-                        Configurer clé API pour modes IA
-                      </button>
-                    )}
                   </motion.div>
                 )}
 
@@ -735,7 +649,7 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                   >
                     <LoadingOrb isDark={isDark} />
                     <span className={`text-xs mt-4 opacity-50 ${isDark ? "text-white" : "text-black"}`}>
-                      Gemini réfléchit...
+                      IA réfléchit...
                     </span>
                   </motion.div>
                 )}
@@ -766,7 +680,7 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                   >
                      <p className="text-red-500 text-sm mb-4 font-medium">{errorMsg}</p>
                      <button 
-                       onClick={() => setState(apiKey ? 'menu' : 'settings')} 
+                       onClick={() => setState('menu')} 
                        className={`px-4 py-2 rounded-full text-xs font-semibold ${isDark ? "bg-white/10 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}
                      >
                        Réessayer
