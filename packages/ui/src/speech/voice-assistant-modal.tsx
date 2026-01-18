@@ -298,6 +298,8 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
     
     try {
       const prompt = `${PROMPTS[mode]}\n\nTexte:"${text}"`;
+      console.log('[Backend] Sending request to AI with mode:', mode);
+      
       const response = await fetch(`/api/workspaces/${workspaceSlug}/ai-assistant/`, {
         method: 'POST',
         headers: {
@@ -311,33 +313,39 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
       });
 
       const responseText = await response.text();
+      console.log('[Backend] Response status:', response.status, 'Body:', responseText.substring(0, 200));
       
       if (!response.ok) {
-        let errorMsg = 'Erreur serveur';
+        let errorMsg = 'Erreur serveur - IA non configurée';
         try {
           const errorData = JSON.parse(responseText);
           errorMsg = errorData.error || errorMsg;
         } catch {
           // Response is not JSON
         }
+        console.error('[Backend] Server error:', errorMsg);
         throw new Error(errorMsg);
       }
 
       if (!responseText || responseText.trim() === '') {
-        console.warn('[Backend] Empty response, returning original text');
-        return { result: text };
+        console.error('[Backend] Empty response from server');
+        throw new Error('Réponse vide du serveur IA');
       }
 
       try {
         const data = JSON.parse(responseText);
         if (!data.response || data.response.trim() === '') {
-          console.warn('[Backend] Empty response field, returning original text');
-          return { result: text };
+          console.error('[Backend] Empty response field in JSON');
+          throw new Error('Réponse IA vide - vérifiez la configuration');
         }
+        console.log('[Backend] AI processed successfully, length:', data.response.length);
         return { result: data.response };
-      } catch {
-        console.warn('[Backend] Response is not JSON, using as text');
-        return { result: responseText };
+      } catch (parseError) {
+        if (parseError instanceof SyntaxError) {
+          console.warn('[Backend] Response is not JSON, using as text');
+          return { result: responseText };
+        }
+        throw parseError;
       }
     } catch (error) {
       console.error('[Backend] Processing error:', error);
