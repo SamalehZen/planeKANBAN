@@ -15,6 +15,7 @@ export interface IBasePowerKStore {
   // observables
   isPowerKModalOpen: boolean;
   isShortcutsListModalOpen: boolean;
+  isVoiceModalOpen: boolean;
   commandRegistry: IPowerKCommandRegistry;
   activeContext: TPowerKContextType | null;
   activePage: TPowerKPageType | null;
@@ -27,12 +28,14 @@ export interface IBasePowerKStore {
   // toggle actions
   togglePowerKModal: (value?: boolean) => void;
   toggleShortcutsListModal: (value?: boolean) => void;
+  toggleVoiceModal: (value?: boolean) => void;
 }
 
 export abstract class BasePowerKStore implements IBasePowerKStore {
   // observables
   isPowerKModalOpen: boolean = false;
   isShortcutsListModalOpen: boolean = false;
+  isVoiceModalOpen: boolean = false;
   commandRegistry: IPowerKCommandRegistry = new PowerKCommandRegistry();
   activeContext: TPowerKContextType | null = null;
   activePage: TPowerKPageType | null = null;
@@ -44,6 +47,7 @@ export abstract class BasePowerKStore implements IBasePowerKStore {
       // observable
       isPowerKModalOpen: observable.ref,
       isShortcutsListModalOpen: observable.ref,
+      isVoiceModalOpen: observable.ref,
       commandRegistry: observable.ref,
       activeContext: observable,
       activePage: observable,
@@ -52,6 +56,7 @@ export abstract class BasePowerKStore implements IBasePowerKStore {
       // toggle actions
       togglePowerKModal: action,
       toggleShortcutsListModal: action,
+      toggleVoiceModal: action,
       setActiveContext: action,
       setActivePage: action,
       setTopNavInputRef: action,
@@ -114,6 +119,19 @@ export abstract class BasePowerKStore implements IBasePowerKStore {
       this.isShortcutsListModalOpen = value;
     } else {
       this.isShortcutsListModalOpen = !this.isShortcutsListModalOpen;
+    }
+  };
+
+  /**
+   * Toggles the voice assistant modal
+   * @param value
+   * @returns
+   */
+  toggleVoiceModal = (value?: boolean) => {
+    if (value !== undefined) {
+      this.isVoiceModalOpen = value;
+    } else {
+      this.isVoiceModalOpen = !this.isVoiceModalOpen;
     }
   };
 }

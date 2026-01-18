@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { Link, PanelLeft, Search } from "lucide-react";
+import { Link, Mic, PanelLeft, Search } from "lucide-react";
 // plane imports
 import { useTranslation } from "@plane/i18n";
 import { setToast, TOAST_TYPE } from "@plane/propel/toast";
@@ -13,7 +13,7 @@ import { usePowerK } from "@/hooks/store/use-power-k";
 export const usePowerKMiscellaneousCommands = (): TPowerKCommandConfig[] => {
   // store hooks
   const { toggleSidebar } = useAppTheme();
-  const { topNavInputRef, topNavSearchInputRef } = usePowerK();
+  const { topNavInputRef, topNavSearchInputRef, toggleVoiceModal } = usePowerK();
   // translation
   const { t } = useTranslation();
 
@@ -77,6 +77,18 @@ export const usePowerKMiscellaneousCommands = (): TPowerKCommandConfig[] => {
       icon: Search,
       action: focusTopNavSearch,
       modifierShortcut: "cmd+f",
+      isEnabled: () => true,
+      isVisible: () => true,
+      closeOnSelect: true,
+    },
+    {
+      id: "toggle_voice_assistant",
+      group: "miscellaneous",
+      type: "action",
+      i18n_title: "power_k.miscellaneous_actions.toggle_voice_assistant",
+      icon: Mic,
+      action: () => toggleVoiceModal(true),
+      modifierShortcut: "cmd+shift+s",
       isEnabled: () => true,
       isVisible: () => true,
       closeOnSelect: true,

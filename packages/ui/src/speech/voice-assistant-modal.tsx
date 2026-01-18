@@ -48,6 +48,7 @@ declare global {
 }
 
 const STORAGE_KEY = 'plane_voice_gemini_key';
+const STORAGE_MODE_KEY = 'plane_voice_last_mode';
 
 const MODE_OPTIONS: { id: ProcessingMode; label: string; icon: string }[] = [
   { id: 'auto', label: 'Auto', icon: '✨' },
@@ -55,19 +56,19 @@ const MODE_OPTIONS: { id: ProcessingMode; label: string; icon: string }[] = [
   { id: 'prompt', label: 'Prompt', icon: '🪄' },
   { id: 'message', label: 'Message', icon: '💬' },
   { id: 'note', label: 'Note', icon: '📝' },
-  { id: 'voice', label: 'Texte', icon: '🎤' },
+  { id: 'voice', label: 'Brut', icon: '📋' },
   { id: 'document', label: 'Doc', icon: '📄' },
   { id: 'planning', label: 'Planning', icon: '📅' },
 ];
 
 const PROMPTS: Record<string, string> = {
-  auto: `Détecte et traite. Réponds uniquement avec le texte traité.`,
-  email: `Email pro: objet, intro, corps, politesse. Réponds uniquement avec l'email.`,
-  prompt: `Prompt optimisé pour LLM. Réponds uniquement avec le prompt.`,
-  message: `Corrige orthographe sans changer le sens. Réponds uniquement avec le texte corrigé.`,
-  note: `Liste tâches avec ☐. Réponds uniquement avec la liste.`,
-  document: `Document: titre, sections. Réponds uniquement avec le document.`,
-  planning: `Planning par date/heure. Réponds uniquement avec le planning.`,
+  auto: `Tu es un assistant de saisie vocale. Formate et améliore le texte dicté suivant tout en préservant son sens. Corrige les fautes et améliore la ponctuation. NE CRÉE PAS de nouvelle tâche ou élément. Réponds UNIQUEMENT avec le texte formaté, sans explication ni commentaire.`,
+  email: `Transforme ce texte dicté en email professionnel avec: objet, introduction, corps du message et formule de politesse. Réponds UNIQUEMENT avec l'email formaté.`,
+  prompt: `Transforme ce texte dicté en prompt optimisé pour un LLM. Réponds UNIQUEMENT avec le prompt optimisé.`,
+  message: `Corrige l'orthographe et la grammaire de ce texte dicté sans changer le sens. Réponds UNIQUEMENT avec le texte corrigé.`,
+  note: `Transforme ce texte dicté en liste de tâches avec des cases ☐. Réponds UNIQUEMENT avec la liste formatée.`,
+  document: `Transforme ce texte dicté en document structuré avec titre et sections. Réponds UNIQUEMENT avec le document formaté.`,
+  planning: `Transforme ce texte dicté en planning organisé par date et heure. Réponds UNIQUEMENT avec le planning formaté.`,
 };
 
 const useThemeDetector = () => {
@@ -216,7 +217,15 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
 }) => {
   const isDark = useThemeDetector();
   const [state, setState] = useState<VoiceState>("settings");
-  const [selectedMode, setSelectedMode] = useState<ProcessingMode>("auto");
+  const [selectedMode, setSelectedMode] = useState<ProcessingMode>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(STORAGE_MODE_KEY);
+      if (saved && MODE_OPTIONS.some(m => m.id === saved)) {
+        return saved as ProcessingMode;
+      }
+    }
+    return "auto";
+  });
   const [timer, setTimer] = useState(0);
   const [liveText, setLiveText] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
@@ -268,10 +277,20 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
   const processWithGemini = useCallback(async (text: string, mode: ProcessingMode) => {
     if (mode === 'voice' || !apiKey) return { result: text };
     
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' });
-    const r = await model.generateContent(`${PROMPTS[mode]}\n\nTexte:"${text}"`);
-    return { result: r.response.text() };
+    try {
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+      const r = await model.generateContent(`${PROMPTS[mode]}\n\nTexte:"${text}"`);
+      const responseText = r.response.text();
+      if (!responseText || responseText.trim() === '') {
+        console.warn('[Gemini] Empty response, returning original text');
+        return { result: text };
+      }
+      return { result: responseText };
+    } catch (error) {
+      console.error('[Gemini] Processing error:', error);
+      return { result: text };
+    }
   }, [apiKey]);
 
   const startRecording = useCallback((mode: ProcessingMode) => {
@@ -283,6 +302,7 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
     }
 
     setSelectedMode(mode);
+    localStorage.setItem(STORAGE_MODE_KEY, mode);
     setErrorMsg('');
     setLiveText('');
     transcriptRef.current = '';
@@ -291,6 +311,8 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = language;
+
+    let isManualStop = false;
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
       let interim = '';
@@ -305,25 +327,53 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
     };
 
     recognition.onerror = (event: { error: string }) => {
-      if (event.error !== 'no-speech') {
+      console.warn('[Speech] Recognition error:', event.error);
+      if (event.error === 'no-speech' || event.error === 'aborted') {
+        return;
+      }
+      if (event.error === 'network') {
+        setErrorMsg('Erreur réseau - vérifiez votre connexion');
+      } else {
         setErrorMsg(event.error);
-        setState('error');
+      }
+      setState('error');
+    };
+
+    recognition.onend = () => {
+      if (!isManualStop && recognitionRef.current) {
+        try {
+          recognition.start();
+        } catch (e) {
+          console.warn('[Speech] Could not restart recognition:', e);
+        }
       }
     };
 
     recognitionRef.current = recognition;
-    recognition.start();
-    setState('listening');
-    setTimer(0);
+    (recognitionRef.current as any)._isManualStop = () => { isManualStop = true; };
+    
+    try {
+      recognition.start();
+      setState('listening');
+      setTimer(0);
+    } catch (e) {
+      console.error('[Speech] Failed to start recognition:', e);
+      setErrorMsg('Impossible de démarrer la reconnaissance vocale');
+      setState('error');
+    }
   }, [language]);
 
   const stopRecording = useCallback(async () => {
     if (recognitionRef.current) {
+      const recognition = recognitionRef.current as any;
+      if (recognition._isManualStop) {
+        recognition._isManualStop();
+      }
       recognitionRef.current.stop();
       recognitionRef.current = null;
     }
 
-    const transcript = transcriptRef.current.trim();
+    const transcript = transcriptRef.current.trim() || liveText.trim();
     if (!transcript) {
       setState('menu');
       return;
@@ -333,20 +383,30 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
 
     try {
       const { result } = await processWithGemini(transcript, selectedMode);
-      setState('result');
-      setTimeout(() => {
-        onResult(result);
-        onClose();
-      }, 1000);
+      if (result && result.trim()) {
+        setState('result');
+        setTimeout(() => {
+          onResult(result);
+          onClose();
+        }, 800);
+      } else {
+        setErrorMsg('Aucun résultat généré');
+        setState('error');
+      }
     } catch (err) {
+      console.error('[Voice] Processing error:', err);
       const msg = err instanceof Error ? err.message : 'Erreur IA';
       setErrorMsg(msg);
       setState('error');
     }
-  }, [selectedMode, processWithGemini, onResult, onClose]);
+  }, [selectedMode, processWithGemini, onResult, onClose, liveText]);
 
   const handleClose = useCallback(() => {
     if (recognitionRef.current) {
+      const recognition = recognitionRef.current as any;
+      if (recognition._isManualStop) {
+        recognition._isManualStop();
+      }
       recognitionRef.current.stop();
       recognitionRef.current = null;
     }
