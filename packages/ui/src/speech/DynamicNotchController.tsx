@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Mic } from 'lucide-react';
 import { DynamicNotch, MODES } from './DynamicNotch';
 import { UIState, ProcessingMode } from './types';
 
@@ -121,6 +122,25 @@ const useThemeDetector = () => {
   return isDark;
 };
 
+const useTouchDevice = () => {
+  const [isTouchDevice, setIsTouchDevice] = useState(false);
+
+  useEffect(() => {
+    const checkTouch = () => {
+      const hasTouch = 'ontouchstart' in window || 
+                       navigator.maxTouchPoints > 0 ||
+                       (window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+      setIsTouchDevice(hasTouch);
+    };
+
+    checkTouch();
+    window.addEventListener('resize', checkTouch);
+    return () => window.removeEventListener('resize', checkTouch);
+  }, []);
+
+  return isTouchDevice;
+};
+
 export interface DynamicNotchControllerProps {
   onResult: (text: string) => void;
   language?: string;
@@ -135,6 +155,7 @@ export const DynamicNotchController: React.FC<DynamicNotchControllerProps> = ({
   enabled = true,
 }) => {
   const isDark = useThemeDetector();
+  const isTouchDevice = useTouchDevice();
   const [isVisible, setIsVisible] = useState(false);
   const [uiState, setUiState] = useState<UIState>(UIState.IDLE);
   const [selectedMode, setSelectedMode] = useState<string | null>(null);
@@ -321,7 +342,7 @@ export const DynamicNotchController: React.FC<DynamicNotchControllerProps> = ({
     }
   }, [selectedMode, processWithBackend, onResult, hideNotch]);
 
-  const handleDoubleCtrl = useCallback(() => {
+  const handleTrigger = useCallback(() => {
     if (!isVisible) {
       showIdleAndMenu();
     } else if (uiState === UIState.LISTENING) {
@@ -341,7 +362,7 @@ export const DynamicNotchController: React.FC<DynamicNotchControllerProps> = ({
         
         if (timeSinceLastCtrl < DOUBLE_CTRL_DELAY) {
           e.preventDefault();
-          handleDoubleCtrl();
+          handleTrigger();
           lastCtrlPressRef.current = 0;
         } else {
           lastCtrlPressRef.current = now;
@@ -351,7 +372,7 @@ export const DynamicNotchController: React.FC<DynamicNotchControllerProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [enabled, handleDoubleCtrl]);
+  }, [enabled, handleTrigger]);
 
   useEffect(() => {
     return () => {
@@ -366,17 +387,47 @@ export const DynamicNotchController: React.FC<DynamicNotchControllerProps> = ({
     startRecording(mode);
   }, [startRecording]);
 
-  if (!isVisible) return null;
+  const handleNotchClick = useCallback(() => {
+    if (uiState === UIState.LISTENING) {
+      stopRecordingAndProcess();
+    }
+  }, [uiState, stopRecordingAndProcess]);
 
   return (
-    <AnimatePresence>
-      <DynamicNotch
-        uiState={uiState}
-        selectedMode={selectedMode}
-        theme={isDark ? 'dark' : 'light'}
-        onModeSelect={handleModeSelect}
-      />
-    </AnimatePresence>
+    <>
+      {isTouchDevice && !isVisible && (
+        <motion.button
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0, opacity: 0 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={handleTrigger}
+          className={`fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full flex items-center justify-center shadow-lg backdrop-blur-xl
+            ${isDark 
+              ? 'bg-[#121212]/90 border border-white/10 shadow-black/50' 
+              : 'bg-white/90 border border-black/5 shadow-black/20'
+            }`}
+          style={{
+            WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          <Mic className={`w-6 h-6 ${isDark ? 'text-white' : 'text-zinc-800'}`} />
+        </motion.button>
+      )}
+
+      <AnimatePresence>
+        {isVisible && (
+          <div onClick={handleNotchClick}>
+            <DynamicNotch
+              uiState={uiState}
+              selectedMode={selectedMode}
+              theme={isDark ? 'dark' : 'light'}
+              onModeSelect={handleModeSelect}
+            />
+          </div>
+        )}
+      </AnimatePresence>
+    </>
   );
 };
 
