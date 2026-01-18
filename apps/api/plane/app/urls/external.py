@@ -3,7 +3,7 @@ from django.urls import path
 
 from plane.app.views import UnsplashEndpoint
 from plane.app.views import GPTIntegrationEndpoint, WorkspaceGPTIntegrationEndpoint
-from plane.app.views import AssemblyAITokenEndpoint, LLMConfigEndpoint
+from plane.app.views import AssemblyAITokenEndpoint, LLMConfigEndpoint, LLMDebugEndpoint
 
 
 urlpatterns = [
@@ -27,5 +27,10 @@ urlpatterns = [
         "workspaces/<str:slug>/llm-config/",
         LLMConfigEndpoint.as_view(),
         name="llm-config",
+    ),
+    path(
+        "workspaces/<str:slug>/llm-debug/",
+        LLMDebugEndpoint.as_view(),
+        name="llm-debug",
     ),
 ]

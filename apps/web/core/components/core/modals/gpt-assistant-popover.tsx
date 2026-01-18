@@ -84,14 +84,17 @@ export function GptAssistantPopover(props: Props) {
 
   const handleServiceError = (err: any) => {
     const error = err?.data?.error;
-    const errorMessage =
-      err?.status === 429
-        ? error || "You have reached the maximum number of requests of 50 requests per month per user."
-        : error || "Some error occurred. Please try again.";
+    let errorMessage = error || "Une erreur s'est produite. Veuillez réessayer.";
+
+    if (err?.status === 429) {
+      errorMessage = error || "Limite de requêtes atteinte (50 par mois par utilisateur).";
+    } else if (err?.status === 400 && (error?.includes("API key") || error?.includes("Configuration AI"))) {
+      errorMessage = "Clé API non configurée. Allez dans Admin > AI Settings pour configurer MiMo.";
+    }
 
     setToast({
       type: TOAST_TYPE.ERROR,
-      title: "Error!",
+      title: "Erreur!",
       message: errorMessage,
     });
 

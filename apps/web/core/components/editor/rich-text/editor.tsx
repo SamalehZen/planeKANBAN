@@ -5,6 +5,7 @@ import type { EditorRefApi, IRichTextEditorProps, TAIActionPayload, TFileHandler
 import type { MakeOptional, TSearchEntityRequestPayload, TSearchResponse } from "@plane/types";
 import { cn } from "@plane/utils";
 import { VoiceAssistantModal } from "@plane/ui";
+import { TOAST_TYPE, setToast } from "@plane/propel/toast";
 import { EditorMentionsRoot } from "@/components/editor/embeds/mentions";
 import { useEditorConfig, useEditorMention } from "@/hooks/editor";
 import { useMember } from "@/hooks/store/use-member";
@@ -132,8 +133,22 @@ export const RichTextEditor = forwardRef(function RichTextEditor(
           task: payload.task,
         });
         return result?.response || null;
-      } catch (error) {
+      } catch (error: any) {
         console.error("AI action failed:", error);
+        const errMsg = error?.data?.error || "Erreur IA";
+        if (errMsg.includes("API key") || errMsg.includes("Configuration AI")) {
+          setToast({
+            type: TOAST_TYPE.ERROR,
+            title: "Erreur!",
+            message: "Clé API non configurée. Allez dans Admin > AI Settings pour configurer MiMo.",
+          });
+        } else {
+          setToast({
+            type: TOAST_TYPE.ERROR,
+            title: "Erreur!",
+            message: errMsg,
+          });
+        }
         return null;
       }
     },

@@ -320,8 +320,10 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
         try {
           const errorData = JSON.parse(responseText);
           errorMsg = errorData.error || errorMsg;
+          if (errorMsg.includes('API key') || errorMsg.includes('Configuration AI')) {
+            errorMsg = 'Clé API non configurée. Allez dans Admin > AI Settings pour configurer MiMo.';
+          }
         } catch {
-          // Response is not JSON
         }
         console.error('[Backend] Server error:', errorMsg);
         throw new Error(errorMsg);

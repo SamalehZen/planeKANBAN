@@ -112,23 +112,24 @@ export function InstanceAIForm(props: IInstanceAIForm) {
     {
       key: "LLM_API_KEY",
       type: "password",
-      label: "API Key",
+      label: "API Key (Obligatoire)",
       description: (
         <>
-          Get your {providerConfig.name} API key{" "}
+          <span className="text-red-500 font-medium">Requis.</span> Obtenez votre clé API {providerConfig.name}{" "}
           <a
             href={getProviderDocLink(selectedProvider)}
             target="_blank"
             className="text-accent-primary hover:underline"
             rel="noreferrer"
           >
-            here.
+            ici.
           </a>
+          {" "}Sans clé API, les fonctionnalités IA ne fonctionneront pas.
         </>
       ),
-      placeholder: "Enter your API key",
+      placeholder: "Entrez votre clé API",
       error: Boolean(errors.LLM_API_KEY),
-      required: false,
+      required: true,
     },
   ];
 
@@ -182,7 +183,8 @@ export function InstanceAIForm(props: IInstanceAIForm) {
         <div className="relative inline-flex items-center gap-2 rounded-sm border border-accent-strong/20 bg-accent-primary/10 px-4 py-2 text-11 text-accent-secondary">
           <Lightbulb height="14" width="14" />
           <div>
-            Currently supporting Xiaomi MiMo (default), OpenAI (ChatGPT), Google Gemini, and Anthropic Claude.
+            ⚠️ <strong>Important:</strong> Vous devez configurer une clé API pour activer les fonctionnalités IA (assistant vocal, amélioration de description, etc.).
+            Providers supportés: Xiaomi MiMo (par défaut), OpenAI, Google Gemini, Anthropic Claude.
           </div>
         </div>
       </div>
