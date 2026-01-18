@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, Square } from 'lucide-react';
+import { Mic, Check } from 'lucide-react';
 import { DynamicNotch } from './DynamicNotch';
 import { UIState } from './types';
 
@@ -165,16 +165,16 @@ export const DynamicNotchController: React.FC<DynamicNotchControllerProps> = ({
             exit={{ scale: 0, opacity: 0, y: 20 }}
             transition={{ type: 'spring', stiffness: 300, damping: 25 }}
             onClick={stopRecording}
-            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-16 h-16 rounded-full flex items-center justify-center shadow-lg bg-red-500 hover:bg-red-600 active:scale-95 transition-all duration-200"
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-16 h-16 rounded-full flex items-center justify-center shadow-lg bg-emerald-500 hover:bg-emerald-600 active:scale-95 transition-all duration-200"
             style={{
-              boxShadow: '0 0 20px rgba(239, 68, 68, 0.5), 0 0 40px rgba(239, 68, 68, 0.3)'
+              boxShadow: '0 0 20px rgba(16, 185, 129, 0.5), 0 0 40px rgba(16, 185, 129, 0.3)'
             }}
           >
             <motion.div
               animate={{ scale: [1, 1.1, 1] }}
               transition={{ repeat: Infinity, duration: 1.5 }}
             >
-              <Square className="w-6 h-6 text-white" fill="white" />
+              <Check className="w-7 h-7 text-white" strokeWidth={3} />
             </motion.div>
           </motion.button>
         )}
