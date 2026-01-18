@@ -497,15 +497,14 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.2 }}
-        className="fixed inset-0 z-[9999]"
-        onClick={handleClose}
+        className="fixed inset-0 z-[9999] pointer-events-none"
       >
         <motion.div
           initial={{ opacity: 0, scale: 0.8, y: -20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.85, y: -10 }}
           transition={dynamicIslandSpring}
-          className="fixed top-6 left-1/2 -translate-x-1/2 z-[10000] w-[360px]"
+          className="fixed top-6 left-1/2 -translate-x-1/2 z-[10000] w-[360px] pointer-events-auto"
           onClick={(e) => e.stopPropagation()}
         >
           <motion.div 
