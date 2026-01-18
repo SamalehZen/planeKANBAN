@@ -66,23 +66,37 @@ export const RichTextEditor = forwardRef(function RichTextEditor(
 
   const handleVoiceResult = useCallback(
     (text: string) => {
-      if (!editorRefInternal.current) return;
+      console.log('[Editor] handleVoiceResult called with:', text);
+      console.log('[Editor] editorRefInternal.current:', !!editorRefInternal.current);
+      
+      if (!editorRefInternal.current) {
+        console.error('[Editor] No editor ref available!');
+        return;
+      }
       const editor = editorRefInternal.current;
 
       if (currentNodeInfo) {
+        console.log('[Editor] Replacing node at:', currentNodeInfo);
         try {
           const view = (editor as any).editor?.view;
           if (view) {
             const { state, dispatch } = view;
             const tr = state.tr.replaceWith(currentNodeInfo.from, currentNodeInfo.to, state.schema.text(text || " "));
             dispatch(tr);
+            console.log('[Editor] Node replaced successfully');
           }
         } catch (e) {
-          console.error("Error updating text:", e);
+          console.error("[Editor] Error updating text:", e);
           editor.insertTextAtCursor(text + " ");
         }
       } else {
-        editor.insertTextAtCursor(text + " ");
+        console.log('[Editor] Inserting at cursor');
+        try {
+          editor.insertTextAtCursor(text + " ");
+          console.log('[Editor] Text inserted successfully');
+        } catch (e) {
+          console.error('[Editor] Error inserting text:', e);
+        }
       }
       setCurrentNodeInfo(null);
     },

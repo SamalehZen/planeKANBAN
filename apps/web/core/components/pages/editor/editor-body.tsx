@@ -145,26 +145,37 @@ export const PageEditorBody = observer(function PageEditorBody(props: Props) {
 
   const handleVoiceResult = useCallback(
     (text: string) => {
+      console.log('[PageEditor] handleVoiceResult called with:', text);
       const editor = editorForwardRef?.current || editorRef?.current;
+      console.log('[PageEditor] editor ref:', !!editor);
+      
       if (!editor) {
-        console.error("[Speech] No editor ref available");
+        console.error("[PageEditor] No editor ref available");
         return;
       }
 
       if (currentNodeInfo) {
+        console.log('[PageEditor] Replacing node at:', currentNodeInfo);
         try {
           const view = (editor as any).editor?.view;
           if (view) {
             const { state, dispatch } = view;
             const tr = state.tr.replaceWith(currentNodeInfo.from, currentNodeInfo.to, state.schema.text(text || " "));
             dispatch(tr);
+            console.log('[PageEditor] Node replaced successfully');
           }
         } catch (e) {
-          console.error("[Speech] Error updating text:", e);
+          console.error("[PageEditor] Error updating text:", e);
           editor.insertTextAtCursor(text + " ");
         }
       } else {
-        editor.insertTextAtCursor(text + " ");
+        console.log('[PageEditor] Inserting at cursor');
+        try {
+          editor.insertTextAtCursor(text + " ");
+          console.log('[PageEditor] Text inserted successfully');
+        } catch (e) {
+          console.error('[PageEditor] Error inserting text:', e);
+        }
       }
       setCurrentNodeInfo(null);
     },
