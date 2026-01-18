@@ -85,6 +85,9 @@ def get_llm_config() -> Tuple[str | None, str | None, str | None]:
     Helper to get LLM configuration values, returns:
         - api_key, model, provider
     """
+    import logging
+    logger = logging.getLogger("plane.ai")
+    
     api_key, provider_key, model = get_configuration_value(
         [
             {
@@ -102,12 +105,18 @@ def get_llm_config() -> Tuple[str | None, str | None, str | None]:
         ]
     )
 
+    logger.info(f"[LLM Config] Provider: {provider_key}, Model: {model}, API Key present: {bool(api_key and api_key.strip())}")
+    
+    if not provider_key:
+        provider_key = "mimo"
+    
     provider = SUPPORTED_PROVIDERS.get(provider_key.lower())
     if not provider:
         log_exception(ValueError(f"Unsupported provider: {provider_key}"))
         return None, None, None
 
-    if not api_key:
+    if not api_key or not api_key.strip():
+        logger.error(f"[LLM Config] Missing or empty API key for provider: {provider.name}")
         log_exception(ValueError(f"Missing API key for provider: {provider.name}"))
         return None, None, None
 
@@ -122,7 +131,7 @@ def get_llm_config() -> Tuple[str | None, str | None, str | None]:
         )
         return None, None, None
 
-    return api_key, model, provider_key
+    return api_key.strip(), model, provider_key
 
 
 def get_llm_response(task, prompt, api_key: str, model: str, provider: str) -> Tuple[str | None, str | None]:
