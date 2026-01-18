@@ -76,35 +76,15 @@ export const RichTextEditor = forwardRef(function RichTextEditor(
       const editor = editorRefInternal.current;
 
       try {
-        if (currentNodeInfo && currentNodeInfo.from !== currentNodeInfo.to) {
-          console.log('[Editor] Replacing node at:', currentNodeInfo);
-          const view = (editor as any).editor?.view;
-          if (view) {
-            const { state, dispatch } = view;
-            const tr = state.tr.insertText(text, currentNodeInfo.from, currentNodeInfo.to);
-            dispatch(tr);
-            console.log('[Editor] Node replaced successfully');
-          } else {
-            console.log('[Editor] No view, falling back to insertTextAtCursor');
-            editor.insertTextAtCursor(text + " ");
-          }
-        } else {
-          console.log('[Editor] Inserting at cursor');
-          editor.insertTextAtCursor(text + " ");
-          console.log('[Editor] Text inserted successfully');
-        }
+        console.log('[Editor] Inserting content (HTML supported)');
+        editor.insertTextAtCursor(text + " ");
+        console.log('[Editor] Content inserted successfully');
       } catch (e) {
-        console.error('[Editor] Error, trying fallback:', e);
-        try {
-          editor.insertTextAtCursor(text + " ");
-          console.log('[Editor] Fallback insert successful');
-        } catch (e2) {
-          console.error('[Editor] Fallback also failed:', e2);
-        }
+        console.error('[Editor] Error inserting content:', e);
       }
       setCurrentNodeInfo(null);
     },
-    [currentNodeInfo]
+    []
   );
 
   const speechHandler = {

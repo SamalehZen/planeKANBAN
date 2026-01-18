@@ -316,7 +316,7 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
     
     try {
       const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
       const r = await model.generateContent(`${PROMPTS[mode]}\n\nTexte:"${text}"`);
       const responseText = r.response.text();
       if (!responseText || responseText.trim() === '') {
