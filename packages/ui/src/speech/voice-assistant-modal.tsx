@@ -234,6 +234,7 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
 
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const transcriptRef = useRef("");
+  const liveTextRef = useRef("");
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -279,7 +280,7 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
     
     try {
       const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-preview-05-20' });
       const r = await model.generateContent(`${PROMPTS[mode]}\n\nTexte:"${text}"`);
       const responseText = r.response.text();
       if (!responseText || responseText.trim() === '') {
@@ -306,6 +307,7 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
     setErrorMsg('');
     setLiveText('');
     transcriptRef.current = '';
+    liveTextRef.current = '';
 
     const recognition = new SpeechRecognitionAPI();
     recognition.continuous = true;
@@ -323,7 +325,9 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
         else interim += result[0].transcript;
       }
       if (final) transcriptRef.current += final;
-      setLiveText(transcriptRef.current + interim);
+      const currentText = transcriptRef.current + interim;
+      liveTextRef.current = currentText;
+      setLiveText(currentText);
     };
 
     recognition.onerror = (event: { error: string }) => {
@@ -373,7 +377,11 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
       recognitionRef.current = null;
     }
 
-    const transcript = transcriptRef.current.trim() || liveText.trim();
+    await new Promise(resolve => setTimeout(resolve, 150));
+
+    const transcript = transcriptRef.current.trim() || liveTextRef.current.trim() || liveText.trim();
+    console.log('[Speech] Final transcript:', transcript, 'transcriptRef:', transcriptRef.current, 'liveTextRef:', liveTextRef.current);
+    
     if (!transcript) {
       setState('menu');
       return;
