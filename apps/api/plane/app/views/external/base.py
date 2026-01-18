@@ -26,6 +26,7 @@ class LLMProvider:
     name: str = ""
     models: List[str] = []
     default_model: str = ""
+    base_url: str = None
 
     @classmethod
     def get_config(cls) -> Dict[str, str | List[str]]:
@@ -33,7 +34,15 @@ class LLMProvider:
             "name": cls.name,
             "models": cls.models,
             "default_model": cls.default_model,
+            "base_url": cls.base_url,
         }
+
+
+class MiMoProvider(LLMProvider):
+    name = "MiMo"
+    models = ["mimo-v2-flash", "mimo-v2-pro", "mimo-v2-lite"]
+    default_model = "mimo-v2-flash"
+    base_url = "https://api.xiaomimimo.com/v1"
 
 
 class OpenAIProvider(LLMProvider):
@@ -64,6 +73,7 @@ class GeminiProvider(LLMProvider):
 
 
 SUPPORTED_PROVIDERS = {
+    "mimo": MiMoProvider,
     "openai": OpenAIProvider,
     "anthropic": AnthropicProvider,
     "gemini": GeminiProvider,
@@ -83,7 +93,7 @@ def get_llm_config() -> Tuple[str | None, str | None, str | None]:
             },
             {
                 "key": "LLM_PROVIDER",
-                "default": os.environ.get("LLM_PROVIDER", "openai"),
+                "default": os.environ.get("LLM_PROVIDER", "mimo"),
             },
             {
                 "key": "LLM_MODEL",
@@ -101,11 +111,9 @@ def get_llm_config() -> Tuple[str | None, str | None, str | None]:
         log_exception(ValueError(f"Missing API key for provider: {provider.name}"))
         return None, None, None
 
-    # If no model specified, use provider's default
     if not model:
         model = provider.default_model
 
-    # Validate model is supported by provider
     if model not in provider.models:
         log_exception(
             ValueError(
@@ -121,11 +129,21 @@ def get_llm_response(task, prompt, api_key: str, model: str, provider: str) -> T
     """Helper to get LLM completion response"""
     final_text = task + "\n" + prompt
     
+    import logging
+    logger = logging.getLogger("plane.ai")
+    
     try:
-        if provider.lower() == "gemini":
-            # Use Google Generative AI SDK for Gemini
-            import logging
-            logger = logging.getLogger("plane.ai")
+        if provider.lower() == "mimo":
+            logger.info(f"[AI MiMo] Using model: {model}")
+            client = OpenAI(api_key=api_key, base_url=MiMoProvider.base_url)
+            chat_completion = client.chat.completions.create(
+                model=model, messages=[{"role": "user", "content": final_text}]
+            )
+            text = chat_completion.choices[0].message.content
+            logger.info(f"[AI MiMo] Success - Response length: {len(text) if text else 0}")
+            return text, None
+            
+        elif provider.lower() == "gemini":
             logger.info(f"[AI Gemini] Using model: {model}")
             
             genai.configure(api_key=api_key)
@@ -141,7 +159,7 @@ def get_llm_response(task, prompt, api_key: str, model: str, provider: str) -> T
             return text, None
             
         elif provider.lower() == "anthropic":
-            # Anthropic uses OpenAI-compatible API format
+            logger.info(f"[AI Anthropic] Using model: {model}")
             client = OpenAI(api_key=api_key, base_url="https://api.anthropic.com/v1")
             chat_completion = client.chat.completions.create(
                 model=model, messages=[{"role": "user", "content": final_text}]
@@ -149,7 +167,7 @@ def get_llm_response(task, prompt, api_key: str, model: str, provider: str) -> T
             text = chat_completion.choices[0].message.content
             return text, None
         else:
-            # OpenAI (default)
+            logger.info(f"[AI OpenAI] Using model: {model}")
             client = OpenAI(api_key=api_key)
             chat_completion = client.chat.completions.create(
                 model=model, messages=[{"role": "user", "content": final_text}]
@@ -158,8 +176,6 @@ def get_llm_response(task, prompt, api_key: str, model: str, provider: str) -> T
             return text, None
     except Exception as e:
         log_exception(e)
-        import logging
-        logger = logging.getLogger("plane.ai")
         logger.error(f"[AI Error] Provider: {provider}, Model: {model}, Error: {str(e)}")
         
         error_type = e.__class__.__name__

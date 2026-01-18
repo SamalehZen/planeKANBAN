@@ -19,8 +19,8 @@ const InstanceAIPage = observer(function InstanceAIPage(_props: Route.ComponentP
         <div className="border-b border-subtle mx-4 py-4 space-y-1 flex-shrink-0">
           <div className="text-18 font-medium text-primary">AI features for all your workspaces</div>
           <div className="text-13 font-regular text-tertiary">
-            Configure your AI provider (OpenAI, Google Gemini, or Anthropic Claude) to enable AI features across all
-            workspaces. AI helps with writing, grammar, translations, and intelligent assistance.
+            Configure your AI provider (Xiaomi MiMo, OpenAI, Google Gemini, or Anthropic Claude) to enable AI features across all
+            workspaces. AI helps with writing, grammar, translations, and intelligent assistance. MiMo v2-Flash is recommended as the default.
           </div>
         </div>
         <div className="flex-grow overflow-hidden overflow-y-scroll vertical-scrollbar scrollbar-md px-4">

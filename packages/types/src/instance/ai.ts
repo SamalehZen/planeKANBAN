@@ -1,8 +1,14 @@
 export type TInstanceAIConfigurationKeys = "LLM_API_KEY" | "LLM_MODEL" | "LLM_PROVIDER";
 
-export type TLLMProvider = "openai" | "gemini" | "anthropic";
+export type TLLMProvider = "mimo" | "openai" | "gemini" | "anthropic";
 
-export const LLM_PROVIDERS: Record<TLLMProvider, { name: string; models: string[]; defaultModel: string }> = {
+export const LLM_PROVIDERS: Record<TLLMProvider, { name: string; models: string[]; defaultModel: string; baseUrl?: string }> = {
+  mimo: {
+    name: "Xiaomi MiMo",
+    models: ["mimo-v2-flash", "mimo-v2-pro", "mimo-v2-lite"],
+    defaultModel: "mimo-v2-flash",
+    baseUrl: "https://api.xiaomimimo.com/v1",
+  },
   openai: {
     name: "OpenAI",
     models: ["gpt-3.5-turbo", "gpt-4o-mini", "gpt-4o", "o1-mini", "o1-preview"],

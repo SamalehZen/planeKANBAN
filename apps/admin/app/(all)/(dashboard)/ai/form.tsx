@@ -27,23 +27,24 @@ export function InstanceAIForm(props: IInstanceAIForm) {
     formState: { errors, isSubmitting },
   } = useForm<AIFormValues>({
     defaultValues: {
-      LLM_PROVIDER: config["LLM_PROVIDER"] || "openai",
+      LLM_PROVIDER: config["LLM_PROVIDER"] || "mimo",
       LLM_API_KEY: config["LLM_API_KEY"],
       LLM_MODEL: config["LLM_MODEL"],
     },
   });
 
-  // Watch provider to update model options
   const selectedProvider = useWatch({
     control,
     name: "LLM_PROVIDER",
-    defaultValue: config["LLM_PROVIDER"] || "openai",
+    defaultValue: config["LLM_PROVIDER"] || "mimo",
   }) as TLLMProvider;
 
   const providerConfig = LLM_PROVIDERS[selectedProvider];
 
   const getProviderDocLink = (provider: TLLMProvider) => {
     switch (provider) {
+      case "mimo":
+        return "https://api.xiaomimimo.com";
       case "openai":
         return "https://platform.openai.com/api-keys";
       case "gemini":
@@ -57,6 +58,8 @@ export function InstanceAIForm(props: IInstanceAIForm) {
 
   const getProviderModelLink = (provider: TLLMProvider) => {
     switch (provider) {
+      case "mimo":
+        return "https://api.xiaomimimo.com/docs/models";
       case "openai":
         return "https://platform.openai.com/docs/models/overview";
       case "gemini":
@@ -149,8 +152,8 @@ export function InstanceAIForm(props: IInstanceAIForm) {
         <div>
           <div className="pb-1 text-18 font-medium text-primary">AI Configuration</div>
           <div className="text-13 font-regular text-tertiary">
-            Configure your AI provider (OpenAI, Google Gemini, or Anthropic Claude) to enable AI features across all
-            workspaces.
+            Configure your AI provider (Xiaomi MiMo, OpenAI, Google Gemini, or Anthropic Claude) to enable AI features across all
+            workspaces. MiMo v2-Flash is recommended for 2.6x faster inference at 97.5% lower cost.
           </div>
         </div>
         <div className="grid-col grid w-full grid-cols-1 items-center justify-between gap-x-12 gap-y-8 lg:grid-cols-3">
@@ -179,7 +182,7 @@ export function InstanceAIForm(props: IInstanceAIForm) {
         <div className="relative inline-flex items-center gap-2 rounded-sm border border-accent-strong/20 bg-accent-primary/10 px-4 py-2 text-11 text-accent-secondary">
           <Lightbulb height="14" width="14" />
           <div>
-            Currently supporting OpenAI (ChatGPT), Google Gemini, and Anthropic Claude. More providers coming soon!
+            Currently supporting Xiaomi MiMo (default), OpenAI (ChatGPT), Google Gemini, and Anthropic Claude.
           </div>
         </div>
       </div>
