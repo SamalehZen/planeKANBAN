@@ -52,7 +52,7 @@ export const GlobalVoiceModal: React.FC = () => {
       onVoiceStart={handleVoiceStart}
       onVoiceEnd={handleVoiceEnd}
       onAIResponse={handleAIResponse}
-      theme="dark"
+      theme="auto"
     />
   );
 };

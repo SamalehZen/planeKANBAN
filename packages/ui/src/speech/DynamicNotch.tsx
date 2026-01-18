@@ -16,23 +16,30 @@ interface DynamicNotchProps {
 }
 
 export const MODES = [
-  { id: 'auto', label: 'Auto', icon: Sparkles, color: 'text-amber-400', colorDark: 'text-amber-400', colorLight: 'text-amber-600', bg: 'bg-amber-400/15' },
-  { id: 'email', label: 'Email', icon: Mail, color: 'text-blue-400', colorDark: 'text-blue-400', colorLight: 'text-blue-600', bg: 'bg-blue-400/15' },
-  { id: 'prompt', label: 'Prompt', icon: Wand2, color: 'text-purple-400', colorDark: 'text-purple-400', colorLight: 'text-purple-600', bg: 'bg-purple-400/15' },
-  { id: 'message', label: 'Message', icon: MessageCircle, color: 'text-emerald-400', colorDark: 'text-emerald-400', colorLight: 'text-emerald-600', bg: 'bg-emerald-400/15' },
-  { id: 'note', label: 'To do lister', icon: StickyNote, color: 'text-yellow-400', colorDark: 'text-yellow-400', colorLight: 'text-yellow-600', bg: 'bg-yellow-400/15' },
-  { id: 'brut', label: 'Brut', icon: Clipboard, color: 'text-zinc-400', colorDark: 'text-zinc-300', colorLight: 'text-zinc-600', bg: 'bg-zinc-400/15' },
-  { id: 'doc', label: 'Doc', icon: FileText, color: 'text-indigo-400', colorDark: 'text-indigo-400', colorLight: 'text-indigo-600', bg: 'bg-indigo-400/15' },
-  { id: 'planning', label: 'Planning', icon: Calendar, color: 'text-rose-400', colorDark: 'text-rose-400', colorLight: 'text-rose-600', bg: 'bg-rose-400/15' },
-  { id: 'weather', label: 'Weather', icon: CloudSun, color: 'text-sky-400', colorDark: 'text-sky-400', colorLight: 'text-sky-600', bg: 'bg-sky-400/15' },
+  { id: 'auto', label: 'Auto', icon: Sparkles, colorDark: 'text-amber-400', colorLight: 'text-amber-600' },
+  { id: 'email', label: 'Email', icon: Mail, colorDark: 'text-blue-400', colorLight: 'text-blue-600' },
+  { id: 'prompt', label: 'Prompt', icon: Wand2, colorDark: 'text-purple-400', colorLight: 'text-purple-600' },
+  { id: 'message', label: 'Message', icon: MessageCircle, colorDark: 'text-emerald-400', colorLight: 'text-emerald-600' },
+  { id: 'note', label: 'To do lister', icon: StickyNote, colorDark: 'text-yellow-400', colorLight: 'text-yellow-600' },
+  { id: 'brut', label: 'Brut', icon: Clipboard, colorDark: 'text-zinc-300', colorLight: 'text-zinc-600' },
+  { id: 'doc', label: 'Doc', icon: FileText, colorDark: 'text-indigo-400', colorLight: 'text-indigo-600' },
+  { id: 'planning', label: 'Planning', icon: Calendar, colorDark: 'text-rose-400', colorLight: 'text-rose-600' },
+  { id: 'weather', label: 'Weather', icon: CloudSun, colorDark: 'text-sky-400', colorLight: 'text-sky-600' },
 ];
 
-const springTransition = {
+const snappySpring = {
   type: "spring" as const,
-  stiffness: 400,
-  damping: 30,
+  stiffness: 500,
+  damping: 35,
   mass: 0.5,
   restDelta: 0.001
+};
+
+const instantSpring = {
+  type: "spring" as const,
+  stiffness: 600,
+  damping: 40,
+  mass: 0.4
 };
 
 export const DynamicNotch: React.FC<DynamicNotchProps> = React.memo(({ uiState, selectedMode, theme = 'dark', onModeSelect }) => {
@@ -67,7 +74,7 @@ export const DynamicNotch: React.FC<DynamicNotchProps> = React.memo(({ uiState, 
           borderBottomLeftRadius: borderBottomRadius,
           borderBottomRightRadius: borderBottomRadius,
         }}
-        transition={springTransition}
+        transition={snappySpring}
         className={`relative flex flex-col items-center pointer-events-auto backdrop-blur-[50px] saturate-[1.8] overflow-hidden rounded-t-none border-t-0
           ${isLight 
             ? 'bg-gradient-to-b from-[#FAFAFA] via-[#F5F5F7] to-[#ECECEE] border-x border-b border-black/[0.08]' 
@@ -94,7 +101,6 @@ export const DynamicNotch: React.FC<DynamicNotchProps> = React.memo(({ uiState, 
             `
         }}
       >
-        {/* Soft Bevel Bottom Edge Highlight */}
         <div 
           className={`absolute bottom-0 left-4 right-4 h-[1px] ${
             isLight 
@@ -104,7 +110,6 @@ export const DynamicNotch: React.FC<DynamicNotchProps> = React.memo(({ uiState, 
           style={{ borderRadius: 'inherit' }}
         />
         
-        {/* Inner bottom glow for 3D depth */}
         <div 
           className={`absolute bottom-0 left-0 right-0 h-8 pointer-events-none ${
             isLight
@@ -119,34 +124,37 @@ export const DynamicNotch: React.FC<DynamicNotchProps> = React.memo(({ uiState, 
           {isMenuOpen ? (
             <motion.div
               key="mode-grid"
-              initial={{ opacity: 0, scale: 0.95, filter: 'blur(8px)' }}
-              animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
-              exit={{ opacity: 0, scale: 0.95, filter: 'blur(8px)', transition: { duration: 0.1 } }}
-              transition={{ duration: 0.2 }}
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.08 } }}
+              transition={{ duration: 0.12 }}
               className="absolute inset-0 w-full h-full p-6 pt-8 grid grid-cols-3 gap-4 place-items-center"
             >
               {MODES.map((mode, i) => (
                 <motion.button
                   key={mode.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.02, type: 'spring', stiffness: 350, damping: 25 }}
+                  initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{ 
+                    delay: i * 0.008,
+                    ...instantSpring
+                  }}
                   onClick={() => onModeSelect && onModeSelect(mode.id)}
                   className="flex flex-col items-center justify-center gap-2.5 w-full h-full group cursor-pointer"
                 >
                   <div 
-                    className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-200 group-hover:scale-110 group-active:scale-95
+                    className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-transform duration-150 group-hover:scale-110 group-active:scale-95
                       ${isLight 
                         ? 'bg-gradient-to-br from-white to-zinc-100/80 shadow-[0_2px_8px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] border border-black/[0.06]' 
-                        : `bg-gradient-to-br from-white/[0.12] to-white/[0.04] shadow-[inset_0_1px_0_rgba(255,255,255,0.1),inset_0_-1px_0_rgba(0,0,0,0.2)] border border-white/[0.08]`
+                        : 'bg-gradient-to-br from-white/[0.12] to-white/[0.04] shadow-[inset_0_1px_0_rgba(255,255,255,0.1),inset_0_-1px_0_rgba(0,0,0,0.2)] border border-white/[0.08]'
                       }`}
                   >
                     <mode.icon 
-                      className={`w-6 h-6 transition-all duration-200 ${isLight ? mode.colorLight : mode.colorDark} group-hover:scale-110`} 
+                      className={`w-6 h-6 ${isLight ? mode.colorLight : mode.colorDark}`} 
                       strokeWidth={1.8}
                     />
                   </div>
-                  <span className={`text-[11px] font-semibold tracking-wide transition-colors ${
+                  <span className={`text-[11px] font-semibold tracking-wide ${
                     isLight 
                       ? 'text-zinc-500 group-hover:text-zinc-900' 
                       : 'text-zinc-400 group-hover:text-white'
@@ -162,17 +170,17 @@ export const DynamicNotch: React.FC<DynamicNotchProps> = React.memo(({ uiState, 
               className="absolute inset-0 w-full h-full flex items-center justify-between px-5"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              exit={{ opacity: 0, transition: { duration: 0.1 } }}
-              transition={{ duration: 0.2 }}
+              exit={{ opacity: 0, transition: { duration: 0.08 } }}
+              transition={{ duration: 0.12 }}
             >
               <div className="flex items-center gap-3 shrink-0">
                 <AnimatePresence mode="wait">
                   <motion.div 
                     key={selectedMode || 'default'}
-                    initial={{ scale: 0.5, opacity: 0, rotate: -20 }}
+                    initial={{ scale: 0.6, opacity: 0, rotate: -15 }}
                     animate={{ scale: 1, opacity: 1, rotate: 0 }}
-                    exit={{ scale: 0.5, opacity: 0, rotate: 20 }}
-                    transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+                    exit={{ scale: 0.6, opacity: 0, rotate: 15 }}
+                    transition={instantSpring}
                     className="relative z-10 flex items-center justify-center w-6 h-6"
                   >
                      {ActiveIconComponent === ChromeIcon ? (
@@ -188,6 +196,7 @@ export const DynamicNotch: React.FC<DynamicNotchProps> = React.memo(({ uiState, 
                 
                 <motion.span
                   layout
+                  transition={instantSpring}
                   className={`text-[14px] font-semibold tracking-wide whitespace-nowrap overflow-hidden
                     ${isLight ? 'text-zinc-800' : 'text-white'}`}
                 >
@@ -203,6 +212,7 @@ export const DynamicNotch: React.FC<DynamicNotchProps> = React.memo(({ uiState, 
                        initial={{ scale: 0, opacity: 0 }}
                        animate={{ scale: 1, opacity: 1 }}
                        exit={{ scale: 0, opacity: 0 }}
+                       transition={instantSpring}
                        className="relative w-2.5 h-2.5 mr-1"
                     >
                        <motion.div 
@@ -225,9 +235,10 @@ export const DynamicNotch: React.FC<DynamicNotchProps> = React.memo(({ uiState, 
                   {uiState === UIState.LISTENING && (
                     <motion.div
                       key="listening"
-                      initial={{ opacity: 0, x: 10 }}
+                      initial={{ opacity: 0, x: 8 }}
                       animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: 10 }}
+                      exit={{ opacity: 0, x: 8 }}
+                      transition={instantSpring}
                       className="h-full flex items-center"
                     >
                       <WaveformIcon isLight={isLight} />
@@ -237,16 +248,17 @@ export const DynamicNotch: React.FC<DynamicNotchProps> = React.memo(({ uiState, 
                   {uiState === UIState.THINKING && (
                     <motion.div
                       key="thinking"
-                      initial={{ opacity: 0, x: 10 }}
+                      initial={{ opacity: 0, x: 8 }}
                       animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: 10 }}
+                      exit={{ opacity: 0, x: 8 }}
+                      transition={instantSpring}
                       className="flex items-center gap-2"
                     >
                        <motion.div
                           animate={{ rotate: 360, scale: [1, 1.15, 1] }}
                           transition={{ 
-                            rotate: { repeat: Infinity, duration: 3, ease: "linear" }, 
-                            scale: { repeat: Infinity, duration: 1.5, ease: "easeInOut" } 
+                            rotate: { repeat: Infinity, duration: 2.5, ease: "linear" }, 
+                            scale: { repeat: Infinity, duration: 1.2, ease: "easeInOut" } 
                           }}
                        >
                           <Sparkles 

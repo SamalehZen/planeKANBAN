@@ -8,15 +8,58 @@ interface DynamicNotchControllerProps {
   onVoiceStart?: () => void;
   onVoiceEnd?: (audioBlob: Blob) => void;
   onAIResponse?: (text: string) => void;
-  theme?: 'light' | 'dark';
+  theme?: 'light' | 'dark' | 'auto';
 }
+
+const useThemeDetector = (): 'light' | 'dark' => {
+  const [theme, setTheme] = useState<'light' | 'dark'>('dark');
+
+  useEffect(() => {
+    const checkTheme = () => {
+      const html = document.documentElement;
+      const isDarkMode = html.classList.contains("dark") || 
+                         html.getAttribute("data-theme") === "dark" ||
+                         html.style.colorScheme === "dark" ||
+                         window.matchMedia('(prefers-color-scheme: dark)').matches;
+      setTheme(isDarkMode ? 'dark' : 'light');
+    };
+
+    checkTheme();
+
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, { 
+      attributes: true, 
+      attributeFilter: ["class", "data-theme", "style"] 
+    });
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    mediaQuery.addEventListener('change', checkTheme);
+
+    return () => {
+      observer.disconnect();
+      mediaQuery.removeEventListener('change', checkTheme);
+    };
+  }, []);
+
+  return theme;
+};
+
+const snappySpring = {
+  type: "spring" as const,
+  stiffness: 500,
+  damping: 35,
+  mass: 0.5
+};
 
 export const DynamicNotchController: React.FC<DynamicNotchControllerProps> = ({
   onVoiceStart,
   onVoiceEnd,
   onAIResponse,
-  theme = 'dark'
+  theme = 'auto'
 }) => {
+  const detectedTheme = useThemeDetector();
+  const actualTheme = theme === 'auto' ? detectedTheme : theme;
+  
   const [isVisible, setIsVisible] = useState(false);
   const [uiState, setUiState] = useState<UIState>(UIState.IDLE);
   const [selectedMode, setSelectedMode] = useState<string | null>(null);
@@ -58,7 +101,7 @@ export const DynamicNotchController: React.FC<DynamicNotchControllerProps> = ({
       setUiState(UIState.IDLE);
       setTimeout(() => {
         setUiState(UIState.MODE_SELECT);
-      }, 1000);
+      }, 200);
     } else if (uiState === UIState.LISTENING) {
       stopRecording();
     }
@@ -118,7 +161,7 @@ export const DynamicNotchController: React.FC<DynamicNotchControllerProps> = ({
     setUiState(UIState.IDLE);
     setTimeout(() => {
       setUiState(UIState.MODE_SELECT);
-    }, 1000);
+    }, 200);
   }, []);
 
   const handleStopClick = useCallback(() => {
@@ -134,7 +177,7 @@ export const DynamicNotchController: React.FC<DynamicNotchControllerProps> = ({
     };
   }, []);
 
-  const isLight = theme === 'light';
+  const isLight = actualTheme === 'light';
 
   return (
     <>
@@ -143,7 +186,7 @@ export const DynamicNotchController: React.FC<DynamicNotchControllerProps> = ({
           <DynamicNotch
             uiState={uiState}
             selectedMode={selectedMode}
-            theme={theme}
+            theme={actualTheme}
             onModeSelect={handleModeSelect}
           />
         )}
@@ -157,11 +200,12 @@ export const DynamicNotchController: React.FC<DynamicNotchControllerProps> = ({
             exit={{ opacity: 0, scale: 0.8 }}
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
+            transition={snappySpring}
             onClick={handleMicClick}
             className={`fixed bottom-6 right-6 z-[9999] w-14 h-14 rounded-full backdrop-blur-xl flex items-center justify-center shadow-lg ${
               isLight
-                ? 'bg-white/80 border border-white/40 shadow-black/10'
-                : 'bg-[#121212]/80 border border-white/10 shadow-black/40'
+                ? 'bg-white/90 border border-black/10 shadow-black/15'
+                : 'bg-[#1A1A1A]/90 border border-white/10 shadow-black/50'
             }`}
           >
             <Mic className={`w-6 h-6 ${isLight ? 'text-zinc-700' : 'text-white'}`} />
@@ -177,6 +221,7 @@ export const DynamicNotchController: React.FC<DynamicNotchControllerProps> = ({
             exit={{ opacity: 0, scale: 0.8, y: 20 }}
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
+            transition={snappySpring}
             onClick={handleStopClick}
             className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999] w-16 h-16 rounded-full bg-red-500 flex items-center justify-center shadow-lg shadow-red-500/40"
             style={{
