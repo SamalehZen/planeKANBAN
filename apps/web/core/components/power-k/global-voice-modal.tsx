@@ -1,41 +1,12 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback } from "react";
 import { createPortal } from "react-dom";
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
-import { VoiceAssistantModal } from "@plane/ui";
-import { usePowerK } from "@/hooks/store/use-power-k";
-
-const DOUBLE_TAP_DELAY = 400;
+import { DynamicNotchController } from "@plane/ui";
 
 export const GlobalVoiceModal = observer(function GlobalVoiceModal() {
   const params = useParams();
   const workspaceSlug = params?.workspaceSlug?.toString() ?? "";
-  const { isVoiceModalOpen, toggleVoiceModal } = usePowerK();
-  
-  const lastCtrlPressRef = useRef<number>(0);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Control" && !e.repeat && !isVoiceModalOpen) {
-        const now = Date.now();
-        const timeSinceLastPress = now - lastCtrlPressRef.current;
-        
-        if (timeSinceLastPress < DOUBLE_TAP_DELAY) {
-          console.log("[Voice] Double-tap Ctrl detected - opening voice modal");
-          toggleVoiceModal(true);
-          lastCtrlPressRef.current = 0;
-        } else {
-          lastCtrlPressRef.current = now;
-        }
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isVoiceModalOpen, toggleVoiceModal]);
 
   const handleResult = useCallback((text: string) => {
     const activeElement = document.activeElement;
@@ -58,10 +29,23 @@ export const GlobalVoiceModal = observer(function GlobalVoiceModal() {
       if (selection && selection.rangeCount > 0) {
         const range = selection.getRangeAt(0);
         range.deleteContents();
-        const textNode = document.createTextNode(text);
-        range.insertNode(textNode);
-        range.setStartAfter(textNode);
-        range.setEndAfter(textNode);
+        
+        const isHtml = text.includes('<') && text.includes('>');
+        if (isHtml) {
+          const tempDiv = document.createElement('div');
+          tempDiv.innerHTML = text;
+          const fragment = document.createDocumentFragment();
+          while (tempDiv.firstChild) {
+            fragment.appendChild(tempDiv.firstChild);
+          }
+          range.insertNode(fragment);
+        } else {
+          const textNode = document.createTextNode(text);
+          range.insertNode(textNode);
+          range.setStartAfter(textNode);
+          range.setEndAfter(textNode);
+        }
+        
         selection.removeAllRanges();
         selection.addRange(range);
         proseMirror.dispatchEvent(new Event("input", { bubbles: true }));
@@ -74,21 +58,16 @@ export const GlobalVoiceModal = observer(function GlobalVoiceModal() {
     });
   }, []);
 
-  const handleClose = useCallback(() => {
-    toggleVoiceModal(false);
-  }, [toggleVoiceModal]);
+  if (!workspaceSlug) return null;
 
-  if (!workspaceSlug || !isVoiceModalOpen) return null;
-
-  const modalContent = (
-    <VoiceAssistantModal
-      isOpen={isVoiceModalOpen}
-      onClose={handleClose}
+  const notchContent = (
+    <DynamicNotchController
       onResult={handleResult}
       language="fr-FR"
       workspaceSlug={workspaceSlug}
+      enabled={true}
     />
   );
 
-  return createPortal(modalContent, document.body);
+  return createPortal(notchContent, document.body);
 });
