@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic } from 'lucide-react';
+import { Mic, MicOff } from 'lucide-react';
 import { DynamicNotch, MODES } from './DynamicNotch';
 import { UIState, ProcessingMode } from './types';
 
@@ -93,7 +93,7 @@ Utilise <table> pour le planning avec colonnes Date/Heure/Tâche, ou <h3> pour c
 };
 
 const DOUBLE_CTRL_DELAY = 300;
-const IDLE_BLINK_DURATION = 1000;
+const IDLE_BLINK_DURATION = 2000;
 const IDLE_DISPLAY_AFTER_RESULT = 3000;
 
 const useThemeDetector = () => {
@@ -395,23 +395,30 @@ export const DynamicNotchController: React.FC<DynamicNotchControllerProps> = ({
 
   return (
     <>
-      {isTouchDevice && !isVisible && (
+      {isTouchDevice && (!isVisible || uiState === UIState.LISTENING) && (
         <motion.button
+          key={uiState === UIState.LISTENING ? 'stop' : 'start'}
           initial={{ scale: 0, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0, opacity: 0 }}
           whileTap={{ scale: 0.9 }}
-          onClick={handleTrigger}
+          onClick={uiState === UIState.LISTENING ? stopRecordingAndProcess : handleTrigger}
           className={`fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full flex items-center justify-center shadow-lg backdrop-blur-xl
-            ${isDark 
-              ? 'bg-[#121212]/90 border border-white/10 shadow-black/50' 
-              : 'bg-white/90 border border-black/5 shadow-black/20'
+            ${uiState === UIState.LISTENING
+              ? 'bg-red-500 border border-red-400 shadow-red-500/30'
+              : isDark 
+                ? 'bg-[#121212]/90 border border-white/10 shadow-black/50' 
+                : 'bg-white/90 border border-black/5 shadow-black/20'
             }`}
           style={{
             WebkitTapHighlightColor: 'transparent',
           }}
         >
-          <Mic className={`w-6 h-6 ${isDark ? 'text-white' : 'text-zinc-800'}`} />
+          {uiState === UIState.LISTENING ? (
+            <MicOff className="w-6 h-6 text-white" />
+          ) : (
+            <Mic className={`w-6 h-6 ${isDark ? 'text-white' : 'text-zinc-800'}`} />
+          )}
         </motion.button>
       )}
 
