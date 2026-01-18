@@ -204,7 +204,7 @@ const RealTimeWaveform = ({ isListening, isDark }: { isListening: boolean; isDar
           key={i}
           className={isDark 
             ? "w-[3px] rounded-full bg-gradient-to-t from-white/40 via-white to-white/40" 
-            : "w-[3px] rounded-full bg-gradient-to-t from-indigo-500/40 via-indigo-600 to-indigo-500/40"
+            : "w-[3px] rounded-full bg-gradient-to-t from-indigo-600 via-indigo-500 to-indigo-600"
           }
           animate={{ height: h }}
           transition={{ type: "spring", stiffness: 300, damping: 20 }}
@@ -511,21 +511,27 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
           <motion.div 
             layout
             transition={dynamicIslandSpring}
-            className={`relative overflow-hidden rounded-[32px] border backdrop-blur-[60px] shadow-2xl ${
+            className={`relative overflow-hidden rounded-[32px] border backdrop-blur-[60px] ${
             isDark 
-              ? "bg-black/80 border-white/10 shadow-black/60" 
-              : "bg-white/80 border-black/5 shadow-xl"
+              ? "bg-black/80 border-white/10 shadow-2xl shadow-black/60" 
+              : "bg-white/90 border-slate-200/60 shadow-xl shadow-slate-300/50"
           }`}>
-            <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-            <div className="absolute bottom-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+            <div className={`absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent ${isDark ? "via-white/20" : "via-slate-300/50"} to-transparent`} />
+            <div className={`absolute bottom-0 inset-x-0 h-px bg-gradient-to-r from-transparent ${isDark ? "via-white/10" : "via-slate-200/50"} to-transparent`} />
             
             <div className="p-5">
               <div className="flex items-center justify-between mb-6 pl-1">
                 <div className="flex items-center gap-3">
                   <motion.div 
                     layoutId="status-icon"
-                    className={`flex items-center justify-center w-10 h-10 rounded-full shadow-inner ${
-                      state === 'listening' ? "bg-red-500/10" : state === 'settings' ? "bg-amber-500/10" : isDark ? "bg-white/10" : "bg-black/5"
+                    className={`flex items-center justify-center w-10 h-10 rounded-full ${
+                      state === 'listening' 
+                        ? "bg-red-500/10" 
+                        : state === 'settings' 
+                          ? "bg-amber-500/10" 
+                          : isDark 
+                            ? "bg-white/10" 
+                            : "bg-indigo-50 shadow-sm"
                     }`}
                   >
                     {state === 'listening' ? (
@@ -537,7 +543,7 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                     ) : state === 'settings' ? (
                       <Key className={`w-5 h-5 ${isDark ? "text-amber-400" : "text-amber-600"}`} />
                     ) : (
-                      <Sparkles className={`w-5 h-5 ${isDark ? "text-white" : "text-black"}`} />
+                      <Sparkles className={`w-5 h-5 ${isDark ? "text-white" : "text-indigo-600"}`} />
                     )}
                   </motion.div>
                   
@@ -565,7 +571,7 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                 <button 
                   onClick={handleClose}
                   className={`p-2 rounded-full transition-all active:scale-95 ${
-                    isDark ? "bg-white/10 hover:bg-white/20 text-white" : "bg-black/5 hover:bg-black/10 text-black"
+                    isDark ? "bg-white/10 hover:bg-white/20 text-white" : "bg-slate-100 hover:bg-slate-200 text-slate-600"
                   }`}
                 >
                   <X className="w-4 h-4" />
@@ -761,7 +767,7 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                      <p className="text-red-500 text-sm mb-4 font-medium">{errorMsg}</p>
                      <button 
                        onClick={() => setState(apiKey ? 'menu' : 'settings')} 
-                       className={`px-4 py-2 rounded-full text-xs font-semibold ${isDark ? "bg-white/10 text-white" : "bg-black/5 text-black"}`}
+                       className={`px-4 py-2 rounded-full text-xs font-semibold ${isDark ? "bg-white/10 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}
                      >
                        Réessayer
                      </button>
