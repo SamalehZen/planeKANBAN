@@ -483,27 +483,38 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
 
   if (!isOpen) return null;
 
+  const dynamicIslandSpring = {
+    type: "spring" as const,
+    stiffness: 400,
+    damping: 30,
+    mass: 1,
+  };
+
   return (
     <AnimatePresence>
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
         className="fixed inset-0 z-[9999]"
         onClick={handleClose}
       >
         <motion.div
-          initial={{ opacity: 0, scale: 0.9, y: 40 }}
+          initial={{ opacity: 0, scale: 0.8, y: -20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.9, y: 40 }}
-          transition={{ type: "spring", damping: 25, stiffness: 350 }}
-          className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[10000] w-[360px]"
+          exit={{ opacity: 0, scale: 0.85, y: -10 }}
+          transition={dynamicIslandSpring}
+          className="fixed top-6 left-1/2 -translate-x-1/2 z-[10000] w-[360px]"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className={`relative overflow-hidden rounded-[36px] border backdrop-blur-[50px] shadow-2xl transition-all duration-500 ${
+          <motion.div 
+            layout
+            transition={dynamicIslandSpring}
+            className={`relative overflow-hidden rounded-[32px] border backdrop-blur-[60px] shadow-2xl ${
             isDark 
-              ? "bg-black/60 border-black shadow-black/50" 
-              : "bg-white/70 border-white shadow-xl"
+              ? "bg-black/80 border-white/10 shadow-black/60" 
+              : "bg-white/80 border-black/5 shadow-xl"
           }`}>
             <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
             <div className="absolute bottom-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
@@ -561,13 +572,14 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                 </button>
               </div>
 
-              <AnimatePresence mode="wait">
+              <AnimatePresence mode="popLayout">
                 {state === 'settings' && (
                   <motion.div 
                     key="settings"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
+                    initial={{ opacity: 0, filter: "blur(10px)" }}
+                    animate={{ opacity: 1, filter: "blur(0px)" }}
+                    exit={{ opacity: 0, filter: "blur(10px)" }}
+                    transition={{ duration: 0.25 }}
                     className="space-y-4"
                   >
                     <div>
@@ -620,9 +632,10 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                 {state === 'menu' && (
                   <motion.div 
                     key="menu"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
+                    initial={{ opacity: 0, filter: "blur(10px)" }}
+                    animate={{ opacity: 1, filter: "blur(0px)" }}
+                    exit={{ opacity: 0, filter: "blur(10px)" }}
+                    transition={{ duration: 0.25 }}
                     className="space-y-3"
                   >
                     <div className="grid grid-cols-4 gap-3">
@@ -676,9 +689,10 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                 {state === 'listening' && (
                   <motion.div 
                     key="listening"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
+                    initial={{ opacity: 0, filter: "blur(10px)" }}
+                    animate={{ opacity: 1, filter: "blur(0px)" }}
+                    exit={{ opacity: 0, filter: "blur(10px)" }}
+                    transition={{ duration: 0.25 }}
                     className="flex flex-col items-center w-full"
                   >
                     <div className="w-full h-16 flex items-center justify-center mb-2">
@@ -705,7 +719,14 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                 )}
 
                 {state === 'processing' && (
-                  <motion.div key="processing" className="py-8 flex flex-col items-center">
+                  <motion.div 
+                    key="processing" 
+                    initial={{ opacity: 0, filter: "blur(10px)" }}
+                    animate={{ opacity: 1, filter: "blur(0px)" }}
+                    exit={{ opacity: 0, filter: "blur(10px)" }}
+                    transition={{ duration: 0.25 }}
+                    className="py-8 flex flex-col items-center"
+                  >
                     <LoadingOrb isDark={isDark} />
                     <span className={`text-xs mt-4 opacity-50 ${isDark ? "text-white" : "text-black"}`}>
                       Gemini réfléchit...
@@ -716,8 +737,10 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                 {state === 'result' && (
                   <motion.div 
                     key="result"
-                    initial={{ scale: 0.5, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
+                    initial={{ scale: 0.8, opacity: 0, filter: "blur(10px)" }}
+                    animate={{ scale: 1, opacity: 1, filter: "blur(0px)" }}
+                    exit={{ scale: 0.8, opacity: 0, filter: "blur(10px)" }}
+                    transition={{ type: "spring", stiffness: 400, damping: 25 }}
                     className="py-6 flex items-center justify-center"
                   >
                     <div className="w-20 h-20 rounded-full bg-green-500 flex items-center justify-center shadow-lg shadow-green-500/40">
@@ -727,7 +750,14 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                 )}
                 
                 {state === 'error' && (
-                  <motion.div key="error" className="py-4 flex flex-col items-center text-center px-4">
+                  <motion.div 
+                    key="error" 
+                    initial={{ opacity: 0, filter: "blur(10px)" }}
+                    animate={{ opacity: 1, filter: "blur(0px)" }}
+                    exit={{ opacity: 0, filter: "blur(10px)" }}
+                    transition={{ duration: 0.25 }}
+                    className="py-4 flex flex-col items-center text-center px-4"
+                  >
                      <p className="text-red-500 text-sm mb-4 font-medium">{errorMsg}</p>
                      <button 
                        onClick={() => setState(apiKey ? 'menu' : 'settings')} 
@@ -739,7 +769,7 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                 )}
               </AnimatePresence>
             </div>
-          </div>
+          </motion.div>
         </motion.div>
       </motion.div>
     </AnimatePresence>
