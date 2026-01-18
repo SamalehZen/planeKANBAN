@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Mic, Square } from 'lucide-react';
 import { DynamicNotch } from './DynamicNotch';
 import { UIState } from './types';
 
@@ -24,7 +26,8 @@ export const DynamicNotchController: React.FC<DynamicNotchControllerProps> = ({
   const audioChunksRef = useRef<Blob[]>([]);
   const mousePositionRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
-  // Track mouse position for text injection
+  const isLight = theme === 'light';
+
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       mousePositionRef.current = { x: e.clientX, y: e.clientY };
@@ -33,7 +36,6 @@ export const DynamicNotchController: React.FC<DynamicNotchControllerProps> = ({
     return () => window.removeEventListener('mousemove', handleMouseMove);
   }, []);
 
-  // CTRL double-tap detection
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Control') {
@@ -41,7 +43,6 @@ export const DynamicNotchController: React.FC<DynamicNotchControllerProps> = ({
         const timeSinceLastPress = now - lastCtrlPressRef.current;
         
         if (timeSinceLastPress < 300) {
-          // Double-tap detected
           handleDoubleTap();
         }
         lastCtrlPressRef.current = now;
@@ -54,19 +55,27 @@ export const DynamicNotchController: React.FC<DynamicNotchControllerProps> = ({
 
   const handleDoubleTap = useCallback(() => {
     if (!isVisible) {
-      // First double-tap: Show IDLE → MODE_SELECT
       setIsVisible(true);
       setUiState(UIState.IDLE);
       
-      // After 1 second, show MODE_SELECT
       setTimeout(() => {
         setUiState(UIState.MODE_SELECT);
       }, 1000);
     } else if (uiState === UIState.LISTENING) {
-      // Second double-tap during LISTENING: Stop recording → THINKING
       stopRecording();
     }
   }, [isVisible, uiState]);
+
+  const handleFloatingButtonClick = useCallback(() => {
+    if (!isVisible) {
+      setIsVisible(true);
+      setUiState(UIState.IDLE);
+      
+      setTimeout(() => {
+        setUiState(UIState.MODE_SELECT);
+      }, 1000);
+    }
+  }, [isVisible]);
 
   const handleModeSelect = useCallback((modeId: string) => {
     setSelectedMode(modeId);
@@ -106,15 +115,10 @@ export const DynamicNotchController: React.FC<DynamicNotchControllerProps> = ({
     }
     setUiState(UIState.THINKING);
 
-    // Simulate AI processing (3-4 seconds)
     setTimeout(() => {
-      // AI processing complete → Return to IDLE
       setUiState(UIState.IDLE);
-      
-      // Inject text at mouse position (callback)
       onAIResponse?.('AI generated text');
       
-      // Hide after 3 seconds
       hideTimeoutRef.current = setTimeout(() => {
         setIsVisible(false);
         setSelectedMode(null);
@@ -123,7 +127,6 @@ export const DynamicNotchController: React.FC<DynamicNotchControllerProps> = ({
     }, 3500);
   }, [onAIResponse]);
 
-  // Cleanup
   useEffect(() => {
     return () => {
       if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
@@ -133,14 +136,58 @@ export const DynamicNotchController: React.FC<DynamicNotchControllerProps> = ({
     };
   }, []);
 
-  if (!isVisible) return null;
-
   return (
-    <DynamicNotch
-      uiState={uiState}
-      selectedMode={selectedMode}
-      theme={theme}
-      onModeSelect={handleModeSelect}
-    />
+    <>
+      <AnimatePresence>
+        {!isVisible && (
+          <motion.button
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+            onClick={handleFloatingButtonClick}
+            className={`fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full flex items-center justify-center shadow-lg backdrop-blur-md transition-all duration-300 hover:scale-110 active:scale-95
+              ${isLight 
+                ? 'bg-white/80 border border-gray-200 shadow-gray-200/50' 
+                : 'bg-zinc-900/80 border border-white/10 shadow-black/30'
+              }`}
+          >
+            <Mic className={`w-6 h-6 ${isLight ? 'text-zinc-700' : 'text-white'}`} />
+          </motion.button>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isVisible && uiState === UIState.LISTENING && (
+          <motion.button
+            initial={{ scale: 0, opacity: 0, y: 20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0, opacity: 0, y: 20 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+            onClick={stopRecording}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-16 h-16 rounded-full flex items-center justify-center shadow-lg bg-red-500 hover:bg-red-600 active:scale-95 transition-all duration-200"
+            style={{
+              boxShadow: '0 0 20px rgba(239, 68, 68, 0.5), 0 0 40px rgba(239, 68, 68, 0.3)'
+            }}
+          >
+            <motion.div
+              animate={{ scale: [1, 1.1, 1] }}
+              transition={{ repeat: Infinity, duration: 1.5 }}
+            >
+              <Square className="w-6 h-6 text-white" fill="white" />
+            </motion.div>
+          </motion.button>
+        )}
+      </AnimatePresence>
+
+      {isVisible && (
+        <DynamicNotch
+          uiState={uiState}
+          selectedMode={selectedMode}
+          theme={theme}
+          onModeSelect={handleModeSelect}
+        />
+      )}
+    </>
   );
 };
