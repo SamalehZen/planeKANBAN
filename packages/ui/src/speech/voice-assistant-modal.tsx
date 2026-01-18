@@ -310,17 +310,35 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
         }),
       });
 
+      const responseText = await response.text();
+      
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Erreur serveur');
+        let errorMsg = 'Erreur serveur';
+        try {
+          const errorData = JSON.parse(responseText);
+          errorMsg = errorData.error || errorMsg;
+        } catch {
+          // Response is not JSON
+        }
+        throw new Error(errorMsg);
       }
 
-      const data = await response.json();
-      if (!data.response || data.response.trim() === '') {
+      if (!responseText || responseText.trim() === '') {
         console.warn('[Backend] Empty response, returning original text');
         return { result: text };
       }
-      return { result: data.response };
+
+      try {
+        const data = JSON.parse(responseText);
+        if (!data.response || data.response.trim() === '') {
+          console.warn('[Backend] Empty response field, returning original text');
+          return { result: text };
+        }
+        return { result: data.response };
+      } catch {
+        console.warn('[Backend] Response is not JSON, using as text');
+        return { result: responseText };
+      }
     } catch (error) {
       console.error('[Backend] Processing error:', error);
       throw error;
