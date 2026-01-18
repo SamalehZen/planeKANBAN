@@ -17,10 +17,17 @@ const useThemeDetector = (): 'light' | 'dark' => {
   useEffect(() => {
     const checkTheme = () => {
       const html = document.documentElement;
-      const isDarkMode = html.classList.contains("dark") || 
-                         html.getAttribute("data-theme") === "dark" ||
-                         html.style.colorScheme === "dark" ||
-                         window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const body = document.body;
+      
+      const isDarkMode = 
+        html.classList.contains("dark") ||
+        body.classList.contains("dark") ||
+        html.getAttribute("data-theme") === "dark" ||
+        body.getAttribute("data-theme") === "dark" ||
+        html.style.colorScheme === "dark" ||
+        document.querySelector('[data-theme="dark"]') !== null ||
+        window.matchMedia('(prefers-color-scheme: dark)').matches;
+      
       setTheme(isDarkMode ? 'dark' : 'light');
     };
 
@@ -28,6 +35,11 @@ const useThemeDetector = (): 'light' | 'dark' => {
 
     const observer = new MutationObserver(checkTheme);
     observer.observe(document.documentElement, { 
+      attributes: true, 
+      attributeFilter: ["class", "data-theme", "style"],
+      subtree: true
+    });
+    observer.observe(document.body, { 
       attributes: true, 
       attributeFilter: ["class", "data-theme", "style"] 
     });
@@ -58,7 +70,8 @@ export const DynamicNotchController: React.FC<DynamicNotchControllerProps> = ({
   theme = 'auto'
 }) => {
   const detectedTheme = useThemeDetector();
-  const actualTheme = theme === 'auto' ? detectedTheme : theme;
+  const actualTheme: 'light' | 'dark' = theme === 'auto' ? detectedTheme : theme;
+  const isLight = actualTheme === 'light';
   
   const [isVisible, setIsVisible] = useState(false);
   const [uiState, setUiState] = useState<UIState>(UIState.IDLE);
@@ -176,8 +189,6 @@ export const DynamicNotchController: React.FC<DynamicNotchControllerProps> = ({
       }
     };
   }, []);
-
-  const isLight = actualTheme === 'light';
 
   return (
     <>

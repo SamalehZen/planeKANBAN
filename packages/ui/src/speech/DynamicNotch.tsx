@@ -16,15 +16,15 @@ interface DynamicNotchProps {
 }
 
 export const MODES = [
-  { id: 'auto', label: 'Auto', icon: Sparkles, colorDark: 'text-amber-400', colorLight: 'text-amber-600' },
-  { id: 'email', label: 'Email', icon: Mail, colorDark: 'text-blue-400', colorLight: 'text-blue-600' },
-  { id: 'prompt', label: 'Prompt', icon: Wand2, colorDark: 'text-purple-400', colorLight: 'text-purple-600' },
-  { id: 'message', label: 'Message', icon: MessageCircle, colorDark: 'text-emerald-400', colorLight: 'text-emerald-600' },
-  { id: 'note', label: 'To do lister', icon: StickyNote, colorDark: 'text-yellow-400', colorLight: 'text-yellow-600' },
-  { id: 'brut', label: 'Brut', icon: Clipboard, colorDark: 'text-zinc-300', colorLight: 'text-zinc-600' },
-  { id: 'doc', label: 'Doc', icon: FileText, colorDark: 'text-indigo-400', colorLight: 'text-indigo-600' },
-  { id: 'planning', label: 'Planning', icon: Calendar, colorDark: 'text-rose-400', colorLight: 'text-rose-600' },
-  { id: 'weather', label: 'Weather', icon: CloudSun, colorDark: 'text-sky-400', colorLight: 'text-sky-600' },
+  { id: 'auto', label: 'Auto', icon: Sparkles, color: 'text-amber-400', bg: 'bg-amber-400/10' },
+  { id: 'email', label: 'Email', icon: Mail, color: 'text-blue-400', bg: 'bg-blue-400/10' },
+  { id: 'prompt', label: 'Prompt', icon: Wand2, color: 'text-purple-400', bg: 'bg-purple-400/10' },
+  { id: 'message', label: 'Message', icon: MessageCircle, color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
+  { id: 'note', label: 'To do lister', icon: StickyNote, color: 'text-yellow-400', bg: 'bg-yellow-400/10' },
+  { id: 'brut', label: 'Brut', icon: Clipboard, color: 'text-zinc-400', bg: 'bg-zinc-400/10' },
+  { id: 'doc', label: 'Doc', icon: FileText, color: 'text-indigo-400', bg: 'bg-indigo-400/10' },
+  { id: 'planning', label: 'Planning', icon: Calendar, color: 'text-rose-400', bg: 'bg-rose-400/10' },
+  { id: 'weather', label: 'Weather', icon: CloudSun, color: 'text-sky-400', bg: 'bg-sky-400/10' },
 ];
 
 const snappySpring = {
@@ -51,7 +51,7 @@ export const DynamicNotch: React.FC<DynamicNotchProps> = React.memo(({ uiState, 
   }, [selectedMode]);
 
   const ActiveIconComponent = activeMode ? activeMode.icon : ChromeIcon;
-  const activeModeColor = activeMode ? (isLight ? activeMode.colorLight : activeMode.colorDark) : null;
+  const activeModeColor = activeMode ? activeMode.color : null;
   const activeLabel = activeMode ? activeMode.label : 'Intelligence';
 
   const { width, height, borderBottomRadius } = useMemo(() => {
@@ -85,20 +85,8 @@ export const DynamicNotch: React.FC<DynamicNotchProps> = React.memo(({ uiState, 
           willChange: 'width, height',
           backfaceVisibility: 'hidden',
           boxShadow: isLight
-            ? `
-              0 8px 32px rgba(0,0,0,0.12),
-              0 2px 8px rgba(0,0,0,0.08),
-              inset 0 -2px 4px rgba(0,0,0,0.02),
-              inset 0 -1px 0 rgba(255,255,255,0.9),
-              inset 0 1px 0 rgba(255,255,255,0.5)
-            `
-            : `
-              0 12px 40px rgba(0,0,0,0.9),
-              0 4px 12px rgba(0,0,0,0.6),
-              inset 0 -2px 6px rgba(255,255,255,0.04),
-              inset 0 -1px 0 rgba(255,255,255,0.12),
-              inset 0 1px 0 rgba(255,255,255,0.02)
-            `
+            ? '0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.08), inset 0 -2px 4px rgba(0,0,0,0.02), inset 0 -1px 0 rgba(255,255,255,0.9), inset 0 1px 0 rgba(255,255,255,0.5)'
+            : '0 12px 40px rgba(0,0,0,0.9), 0 4px 12px rgba(0,0,0,0.6), inset 0 -2px 6px rgba(255,255,255,0.04), inset 0 -1px 0 rgba(255,255,255,0.12), inset 0 1px 0 rgba(255,255,255,0.02)'
         }}
       >
         <div 
@@ -107,7 +95,6 @@ export const DynamicNotch: React.FC<DynamicNotchProps> = React.memo(({ uiState, 
               ? 'bg-gradient-to-r from-transparent via-white/80 to-transparent' 
               : 'bg-gradient-to-r from-transparent via-white/15 to-transparent'
           }`}
-          style={{ borderRadius: 'inherit' }}
         />
         
         <div 
@@ -116,11 +103,9 @@ export const DynamicNotch: React.FC<DynamicNotchProps> = React.memo(({ uiState, 
               ? 'bg-gradient-to-t from-black/[0.02] to-transparent'
               : 'bg-gradient-to-t from-white/[0.03] to-transparent'
           }`}
-          style={{ borderRadius: 'inherit' }}
         />
 
         <AnimatePresence mode="popLayout" initial={false}>
-          
           {isMenuOpen ? (
             <motion.div
               key="mode-grid"
@@ -135,10 +120,7 @@ export const DynamicNotch: React.FC<DynamicNotchProps> = React.memo(({ uiState, 
                   key={mode.id}
                   initial={{ opacity: 0, y: 8, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
-                  transition={{ 
-                    delay: i * 0.008,
-                    ...instantSpring
-                  }}
+                  transition={{ delay: i * 0.008, ...instantSpring }}
                   onClick={() => onModeSelect && onModeSelect(mode.id)}
                   className="flex flex-col items-center justify-center gap-2.5 w-full h-full group cursor-pointer"
                 >
@@ -146,11 +128,11 @@ export const DynamicNotch: React.FC<DynamicNotchProps> = React.memo(({ uiState, 
                     className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-transform duration-150 group-hover:scale-110 group-active:scale-95
                       ${isLight 
                         ? 'bg-gradient-to-br from-white to-zinc-100/80 shadow-[0_2px_8px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] border border-black/[0.06]' 
-                        : 'bg-gradient-to-br from-white/[0.12] to-white/[0.04] shadow-[inset_0_1px_0_rgba(255,255,255,0.1),inset_0_-1px_0_rgba(0,0,0,0.2)] border border-white/[0.08]'
+                        : `${mode.bg} border border-white/[0.08]`
                       }`}
                   >
                     <mode.icon 
-                      className={`w-6 h-6 ${isLight ? mode.colorLight : mode.colorDark}`} 
+                      className={`w-6 h-6 ${mode.color}`} 
                       strokeWidth={1.8}
                     />
                   </div>
