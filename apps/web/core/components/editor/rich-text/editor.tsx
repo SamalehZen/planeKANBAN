@@ -75,27 +75,31 @@ export const RichTextEditor = forwardRef(function RichTextEditor(
       }
       const editor = editorRefInternal.current;
 
-      if (currentNodeInfo) {
-        console.log('[Editor] Replacing node at:', currentNodeInfo);
-        try {
+      try {
+        if (currentNodeInfo && currentNodeInfo.from !== currentNodeInfo.to) {
+          console.log('[Editor] Replacing node at:', currentNodeInfo);
           const view = (editor as any).editor?.view;
           if (view) {
             const { state, dispatch } = view;
-            const tr = state.tr.replaceWith(currentNodeInfo.from, currentNodeInfo.to, state.schema.text(text || " "));
+            const tr = state.tr.insertText(text, currentNodeInfo.from, currentNodeInfo.to);
             dispatch(tr);
             console.log('[Editor] Node replaced successfully');
+          } else {
+            console.log('[Editor] No view, falling back to insertTextAtCursor');
+            editor.insertTextAtCursor(text + " ");
           }
-        } catch (e) {
-          console.error("[Editor] Error updating text:", e);
-          editor.insertTextAtCursor(text + " ");
-        }
-      } else {
-        console.log('[Editor] Inserting at cursor');
-        try {
+        } else {
+          console.log('[Editor] Inserting at cursor');
           editor.insertTextAtCursor(text + " ");
           console.log('[Editor] Text inserted successfully');
-        } catch (e) {
-          console.error('[Editor] Error inserting text:', e);
+        }
+      } catch (e) {
+        console.error('[Editor] Error, trying fallback:', e);
+        try {
+          editor.insertTextAtCursor(text + " ");
+          console.log('[Editor] Fallback insert successful');
+        } catch (e2) {
+          console.error('[Editor] Fallback also failed:', e2);
         }
       }
       setCurrentNodeInfo(null);
