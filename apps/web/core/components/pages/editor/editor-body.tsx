@@ -154,27 +154,31 @@ export const PageEditorBody = observer(function PageEditorBody(props: Props) {
         return;
       }
 
-      if (currentNodeInfo) {
-        console.log('[PageEditor] Replacing node at:', currentNodeInfo);
-        try {
+      try {
+        if (currentNodeInfo && currentNodeInfo.from !== currentNodeInfo.to) {
+          console.log('[PageEditor] Replacing node at:', currentNodeInfo);
           const view = (editor as any).editor?.view;
           if (view) {
             const { state, dispatch } = view;
-            const tr = state.tr.replaceWith(currentNodeInfo.from, currentNodeInfo.to, state.schema.text(text || " "));
+            const tr = state.tr.insertText(text, currentNodeInfo.from, currentNodeInfo.to);
             dispatch(tr);
             console.log('[PageEditor] Node replaced successfully');
+          } else {
+            console.log('[PageEditor] No view, falling back to insertTextAtCursor');
+            editor.insertTextAtCursor(text + " ");
           }
-        } catch (e) {
-          console.error("[PageEditor] Error updating text:", e);
-          editor.insertTextAtCursor(text + " ");
-        }
-      } else {
-        console.log('[PageEditor] Inserting at cursor');
-        try {
+        } else {
+          console.log('[PageEditor] Inserting at cursor');
           editor.insertTextAtCursor(text + " ");
           console.log('[PageEditor] Text inserted successfully');
-        } catch (e) {
-          console.error('[PageEditor] Error inserting text:', e);
+        }
+      } catch (e) {
+        console.error('[PageEditor] Error, trying fallback:', e);
+        try {
+          editor.insertTextAtCursor(text + " ");
+          console.log('[PageEditor] Fallback insert successful');
+        } catch (e2) {
+          console.error('[PageEditor] Fallback also failed:', e2);
         }
       }
       setCurrentNodeInfo(null);
