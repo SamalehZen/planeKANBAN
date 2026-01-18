@@ -2,11 +2,14 @@ import os
 import requests
 import logging
 
+from django.conf import settings
+
 from rest_framework import status
 from rest_framework.response import Response
 
 from plane.app.permissions import ROLE, allow_permission
 from plane.license.utils.instance_value import get_configuration_value
+from plane.license.models import InstanceConfiguration
 from plane.utils.exception_logger import log_exception
 
 from ..base import BaseAPIView
@@ -53,8 +56,24 @@ class LLMDebugEndpoint(BaseAPIView):
         
         api_key, model, provider = get_llm_config()
         
+        db_configs = {}
+        try:
+            configs = InstanceConfiguration.objects.filter(
+                key__in=["LLM_API_KEY", "LLM_PROVIDER", "LLM_MODEL"]
+            ).values("key", "value", "is_encrypted")
+            for c in configs:
+                db_configs[c["key"]] = {
+                    "value_present": bool(c["value"] and str(c["value"]).strip()),
+                    "value_length": len(str(c["value"])) if c["value"] else 0,
+                    "is_encrypted": c["is_encrypted"],
+                }
+        except Exception as e:
+            db_configs = {"error": str(e)}
+        
         return Response(
             {
+                "skip_env_var": settings.SKIP_ENV_VAR,
+                "database_configs": db_configs,
                 "raw_values": {
                     "api_key_present": bool(raw_api_key and raw_api_key.strip()),
                     "api_key_length": len(raw_api_key) if raw_api_key else 0,
