@@ -68,13 +68,14 @@ Utilise le formatage HTML suivant pour enrichir le texte:
 - Liste à puces: <ul><li>item</li></ul>
 - Liste de tâches: <ul data-type="taskList"><li data-type="taskItem" data-checked="false">tâche</li></ul>
 - Tableau: <table><tr><th>En-tête</th></tr><tr><td>Cellule</td></tr></table>
-- Citation: <blockquote>texte</blockquote>
+- Citation/Quote: <blockquote><p>texte cité</p></blockquote>
 - Code: <code>code</code> ou <pre><code>bloc de code</code></pre>
 - Callout: <div data-type="callout" data-color="blue">📌 Note importante</div>
 - Séparateur: <hr>
 - Gras: <strong>texte</strong>
 - Italique: <em>texte</em>
 - Couleur: <span style="color: #color">texte</span>
+- Emoji: Utilise des emojis pertinents pour enrichir le texte (📝 ✅ ⚠️ 💡 🎯 📌 🔥 ⭐ 📅 👉 etc.)
 `;
 
 const PROMPTS: Record<string, string> = {
