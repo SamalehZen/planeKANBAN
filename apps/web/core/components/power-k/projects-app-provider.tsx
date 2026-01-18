@@ -14,6 +14,7 @@ import { WorkspaceLevelModals } from "@/plane-web/components/command-palette/mod
 import { useProjectsAppPowerKCommands } from "./config/commands";
 import type { TPowerKCommandConfig, TPowerKContext } from "./core/types";
 import { GlobalShortcutsProvider } from "./global-shortcuts";
+import { GlobalVoiceModal } from "./global-voice-modal";
 import { ProjectsAppPowerKCommandsList } from "./ui/modal/commands-list";
 import { ProjectsAppPowerKModalWrapper } from "./ui/modal/wrapper";
 
@@ -73,6 +74,7 @@ export const ProjectsAppPowerKProvider = observer(function ProjectsAppPowerKProv
   return (
     <>
       <GlobalShortcutsProvider context={context} commands={commands} />
+      <GlobalVoiceModal />
       {workspaceSlug && <WorkspaceLevelModals workspaceSlug={workspaceSlug.toString()} />}
       {workspaceSlug && projectId && (
         <ProjectLevelModals workspaceSlug={workspaceSlug.toString()} projectId={projectId.toString()} />
