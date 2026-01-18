@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
 
 interface IconProps {
   className?: string;
@@ -16,16 +17,36 @@ interface WaveformIconProps {
 }
 
 export const WaveformIcon: React.FC<WaveformIconProps> = ({ isLight = false }) => {
-  const barColor = isLight ? 'bg-zinc-600' : 'bg-white';
+  const [heights, setHeights] = useState<number[]>([12, 18, 14, 20, 16, 22, 15]);
+  
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setHeights(prev => prev.map(() => 8 + Math.random() * 16));
+    }, 120);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
-    <div className="flex items-center gap-[2px] h-5">
-      {[1, 2, 3, 4, 5].map((i) => (
-        <div
+    <div className="flex items-center gap-[3px] h-6">
+      {heights.map((h, i) => (
+        <motion.div
           key={i}
-          className={`w-[3px] rounded-full ${barColor} animate-pulse`}
+          animate={{ height: h }}
+          transition={{
+            type: "spring",
+            stiffness: 300,
+            damping: 15,
+            mass: 0.5
+          }}
+          className={`w-[3px] rounded-full ${
+            isLight 
+              ? 'bg-gradient-to-t from-zinc-700 via-zinc-500 to-zinc-400' 
+              : 'bg-gradient-to-t from-white/60 via-white to-white/60'
+          }`}
           style={{
-            height: `${8 + Math.random() * 12}px`,
-            animationDelay: `${i * 0.1}s`,
+            boxShadow: isLight 
+              ? '0 0 4px rgba(0,0,0,0.1)' 
+              : '0 0 6px rgba(255,255,255,0.3)'
           }}
         />
       ))}
