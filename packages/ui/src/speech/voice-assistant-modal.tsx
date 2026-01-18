@@ -249,9 +249,9 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
       setLiveText("");
       setErrorMsg("");
       setTimer(0);
-      setState(apiKey ? "menu" : "settings");
+      setState("menu");
     }
-  }, [isOpen, apiKey]);
+  }, [isOpen]);
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
@@ -280,7 +280,7 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
     
     try {
       const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-preview-05-20' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' });
       const r = await model.generateContent(`${PROMPTS[mode]}\n\nTexte:"${text}"`);
       const responseText = r.response.text();
       if (!responseText || responseText.trim() === '') {
@@ -384,6 +384,15 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
     
     if (!transcript) {
       setState('menu');
+      return;
+    }
+
+    if (selectedMode === 'voice') {
+      setState('result');
+      setTimeout(() => {
+        onResult(transcript);
+        onClose();
+      }, 300);
       return;
     }
 
@@ -565,30 +574,53 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
-                    className="grid grid-cols-4 gap-3"
+                    className="space-y-3"
                   >
-                    {MODE_OPTIONS.map((mode, i) => (
-                      <motion.button
-                        key={mode.id}
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: i * 0.03 }}
-                        whileTap={{ scale: 0.92 }}
-                        onClick={() => startRecording(mode.id)}
-                        className="flex flex-col items-center gap-2"
-                      >
-                        <div className={`w-14 h-14 rounded-[18px] flex items-center justify-center text-2xl transition-all shadow-sm border ${
+                    <div className="grid grid-cols-4 gap-3">
+                      {MODE_OPTIONS.map((mode, i) => {
+                        const needsApiKey = mode.id !== 'voice';
+                        const isDisabled = needsApiKey && !apiKey;
+                        
+                        return (
+                          <motion.button
+                            key={mode.id}
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ delay: i * 0.03 }}
+                            whileTap={{ scale: 0.92 }}
+                            onClick={() => !isDisabled && startRecording(mode.id)}
+                            disabled={isDisabled}
+                            className={`flex flex-col items-center gap-2 ${isDisabled ? 'opacity-40 cursor-not-allowed' : ''}`}
+                            title={isDisabled ? 'Clé API Gemini requise' : mode.label}
+                          >
+                            <div className={`w-14 h-14 rounded-[18px] flex items-center justify-center text-2xl transition-all shadow-sm border ${
+                              isDark 
+                                ? "bg-white/5 border-white/5 hover:bg-white/10" 
+                                : "bg-white border-slate-100 hover:bg-slate-50 hover:shadow-md"
+                            }`}>
+                              {mode.icon}
+                            </div>
+                            <span className={`text-[10px] font-medium opacity-70 ${isDark ? "text-white" : "text-slate-900"}`}>
+                              {mode.label}
+                            </span>
+                          </motion.button>
+                        );
+                      })}
+                    </div>
+                    
+                    {!apiKey && (
+                      <button
+                        onClick={() => setState('settings')}
+                        className={`w-full py-2 text-xs font-medium rounded-xl transition-all ${
                           isDark 
-                            ? "bg-white/5 border-white/5 hover:bg-white/10" 
-                            : "bg-white border-slate-100 hover:bg-slate-50 hover:shadow-md"
-                        }`}>
-                          {mode.icon}
-                        </div>
-                        <span className={`text-[10px] font-medium opacity-70 ${isDark ? "text-white" : "text-slate-900"}`}>
-                          {mode.label}
-                        </span>
-                      </motion.button>
-                    ))}
+                            ? "text-white/50 hover:text-white/80 hover:bg-white/5" 
+                            : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"
+                        }`}
+                      >
+                        <Key className="w-3 h-3 inline mr-1" />
+                        Configurer clé API pour modes IA
+                      </button>
+                    )}
                   </motion.div>
                 )}
 
