@@ -116,15 +116,15 @@ export const IssueDescriptionEditor = observer(function IssueDescriptionEditor(p
     aiService
       .createGptTask(workspaceSlug.toString(), {
         prompt: issueName,
-        task: "Generate a proper description for this work item.",
+        task: "Génère une description détaillée et professionnelle pour cet élément de travail. Réponds dans la même langue que le titre. Si le titre est en français, réponds en français. Si le titre est en anglais, réponds en anglais.",
       })
       .then((res) => {
         if (res.response === "")
           setToast({
             type: TOAST_TYPE.ERROR,
-            title: "Error!",
+            title: "Erreur !",
             message:
-              "Work item title isn't informative enough to generate the description. Please try with a different title.",
+              "Le titre n'est pas assez informatif pour générer une description. Essayez avec un titre plus détaillé.",
           });
         else handleAiAssistance(res.response_html);
       })
@@ -134,14 +134,14 @@ export const IssueDescriptionEditor = observer(function IssueDescriptionEditor(p
         if (err.status === 429)
           setToast({
             type: TOAST_TYPE.ERROR,
-            title: "Error!",
-            message: error || "You have reached the maximum number of requests of 50 requests per month per user.",
+            title: "Erreur !",
+            message: error || "Vous avez atteint la limite de 50 requêtes par mois.",
           });
         else
           setToast({
             type: TOAST_TYPE.ERROR,
-            title: "Error!",
-            message: error || "Some error occurred. Please try again.",
+            title: "Erreur !",
+            message: error || "Une erreur s'est produite. Veuillez réessayer.",
           });
       })
       .finally(() => setIAmFeelingLucky(false));
@@ -249,10 +249,10 @@ export const IssueDescriptionEditor = observer(function IssueDescriptionEditor(p
                 tabIndex={getIndex("feeling_lucky")}
               >
                 {iAmFeelingLucky ? (
-                  "Generating response"
+                  "Génération en cours..."
                 ) : (
                   <>
-                    <Sparkle className="h-3.5 w-3.5" />I{"'"}m feeling lucky
+                    <Sparkle className="h-3.5 w-3.5" />J{"'"}ai de la chance
                   </>
                 )}
               </button>

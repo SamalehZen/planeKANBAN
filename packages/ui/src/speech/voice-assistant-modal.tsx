@@ -61,14 +61,51 @@ const MODE_OPTIONS: { id: ProcessingMode; label: string; icon: string }[] = [
   { id: 'planning', label: 'Planning', icon: '📅' },
 ];
 
+const FORMATTING_INSTRUCTIONS = `
+Utilise le formatage HTML suivant pour enrichir le texte:
+- Titres: <h1>, <h2>, <h3>, <h4>, <h5>, <h6>
+- Liste numérotée: <ol><li>item</li></ol>
+- Liste à puces: <ul><li>item</li></ul>
+- Liste de tâches: <ul data-type="taskList"><li data-type="taskItem" data-checked="false">tâche</li></ul>
+- Tableau: <table><tr><th>En-tête</th></tr><tr><td>Cellule</td></tr></table>
+- Citation/Quote: <blockquote><p>texte cité</p></blockquote>
+- Code: <code>code</code> ou <pre><code>bloc de code</code></pre>
+- Callout: <div data-type="callout" data-color="blue">📌 Note importante</div>
+- Séparateur: <hr>
+- Gras: <strong>texte</strong>
+- Italique: <em>texte</em>
+- Couleur: <span style="color: #color">texte</span>
+- Emoji: Utilise des emojis pertinents pour enrichir le texte (📝 ✅ ⚠️ 💡 🎯 📌 🔥 ⭐ 📅 👉 etc.)
+`;
+
 const PROMPTS: Record<string, string> = {
-  auto: `Tu es un assistant de saisie vocale. Formate et améliore le texte dicté suivant tout en préservant son sens. Corrige les fautes et améliore la ponctuation. NE CRÉE PAS de nouvelle tâche ou élément. Réponds UNIQUEMENT avec le texte formaté, sans explication ni commentaire.`,
-  email: `Transforme ce texte dicté en email professionnel avec: objet, introduction, corps du message et formule de politesse. Réponds UNIQUEMENT avec l'email formaté.`,
-  prompt: `Transforme ce texte dicté en prompt optimisé pour un LLM. Réponds UNIQUEMENT avec le prompt optimisé.`,
-  message: `Corrige l'orthographe et la grammaire de ce texte dicté sans changer le sens. Réponds UNIQUEMENT avec le texte corrigé.`,
-  note: `Transforme ce texte dicté en liste de tâches avec des cases ☐. Réponds UNIQUEMENT avec la liste formatée.`,
-  document: `Transforme ce texte dicté en document structuré avec titre et sections. Réponds UNIQUEMENT avec le document formaté.`,
-  planning: `Transforme ce texte dicté en planning organisé par date et heure. Réponds UNIQUEMENT avec le planning formaté.`,
+  auto: `Tu es un assistant de saisie vocale expert en formatage. Analyse le texte dicté et formate-le de manière appropriée en utilisant le formatage riche.
+${FORMATTING_INSTRUCTIONS}
+Détecte le type de contenu (liste, document, email, etc.) et applique le formatage adapté. Corrige les fautes. Réponds UNIQUEMENT avec le HTML formaté.`,
+  
+  email: `Transforme ce texte dicté en email professionnel formaté.
+${FORMATTING_INSTRUCTIONS}
+Structure: <h2>Objet: ...</h2>, puis paragraphes avec <p>, signature en <em>. Réponds UNIQUEMENT avec le HTML.`,
+  
+  prompt: `Transforme ce texte dicté en prompt optimisé pour LLM.
+${FORMATTING_INSTRUCTIONS}
+Utilise <h3> pour les sections, <ul> pour les contraintes, <blockquote> pour les exemples. Réponds UNIQUEMENT avec le HTML.`,
+  
+  message: `Corrige l'orthographe et la grammaire de ce texte dicté.
+Garde le formatage simple avec <p> pour les paragraphes. Corrige sans changer le sens. Réponds UNIQUEMENT avec le HTML.`,
+  
+  note: `Transforme ce texte dicté en liste de tâches structurée.
+${FORMATTING_INSTRUCTIONS}
+Utilise <ul data-type="taskList"><li data-type="taskItem" data-checked="false">tâche</li></ul> pour les tâches.
+Groupe par catégories avec <h3>. Réponds UNIQUEMENT avec le HTML.`,
+  
+  document: `Transforme ce texte dicté en document structuré et professionnel.
+${FORMATTING_INSTRUCTIONS}
+Utilise <h1> pour le titre, <h2> et <h3> pour les sections, <ul> ou <ol> pour les listes, <blockquote> pour les citations importantes, <table> si nécessaire. Réponds UNIQUEMENT avec le HTML.`,
+  
+  planning: `Transforme ce texte dicté en planning organisé.
+${FORMATTING_INSTRUCTIONS}
+Utilise <table> pour le planning avec colonnes Date/Heure/Tâche, ou <h3> pour chaque jour avec <ul data-type="taskList"> pour les tâches. Réponds UNIQUEMENT avec le HTML.`,
 };
 
 const useThemeDetector = () => {
@@ -280,7 +317,7 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
     
     try {
       const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
       const r = await model.generateContent(`${PROMPTS[mode]}\n\nTexte:"${text}"`);
       const responseText = r.response.text();
       if (!responseText || responseText.trim() === '') {

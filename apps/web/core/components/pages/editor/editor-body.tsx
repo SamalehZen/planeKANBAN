@@ -155,35 +155,15 @@ export const PageEditorBody = observer(function PageEditorBody(props: Props) {
       }
 
       try {
-        if (currentNodeInfo && currentNodeInfo.from !== currentNodeInfo.to) {
-          console.log('[PageEditor] Replacing node at:', currentNodeInfo);
-          const view = (editor as any).editor?.view;
-          if (view) {
-            const { state, dispatch } = view;
-            const tr = state.tr.insertText(text, currentNodeInfo.from, currentNodeInfo.to);
-            dispatch(tr);
-            console.log('[PageEditor] Node replaced successfully');
-          } else {
-            console.log('[PageEditor] No view, falling back to insertTextAtCursor');
-            editor.insertTextAtCursor(text + " ");
-          }
-        } else {
-          console.log('[PageEditor] Inserting at cursor');
-          editor.insertTextAtCursor(text + " ");
-          console.log('[PageEditor] Text inserted successfully');
-        }
+        console.log('[PageEditor] Inserting content (HTML supported)');
+        editor.insertTextAtCursor(text + " ");
+        console.log('[PageEditor] Content inserted successfully');
       } catch (e) {
-        console.error('[PageEditor] Error, trying fallback:', e);
-        try {
-          editor.insertTextAtCursor(text + " ");
-          console.log('[PageEditor] Fallback insert successful');
-        } catch (e2) {
-          console.error('[PageEditor] Fallback also failed:', e2);
-        }
+        console.error('[PageEditor] Error inserting content:', e);
       }
       setCurrentNodeInfo(null);
     },
-    [editorRef, editorForwardRef, currentNodeInfo]
+    [editorRef, editorForwardRef]
   );
 
   const speechHandler = useMemo(
