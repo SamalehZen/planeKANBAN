@@ -388,9 +388,15 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
     }
 
     if (selectedMode === 'voice') {
+      console.log('[Voice] Brut mode - calling onResult with:', transcript);
       setState('result');
       setTimeout(() => {
-        onResult(transcript);
+        try {
+          onResult(transcript);
+          console.log('[Voice] onResult called successfully');
+        } catch (e) {
+          console.error('[Voice] Error in onResult:', e);
+        }
         onClose();
       }, 300);
       return;
@@ -401,9 +407,15 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
     try {
       const { result } = await processWithGemini(transcript, selectedMode);
       if (result && result.trim()) {
+        console.log('[Voice] AI mode - calling onResult with:', result.substring(0, 100));
         setState('result');
         setTimeout(() => {
-          onResult(result);
+          try {
+            onResult(result);
+            console.log('[Voice] onResult called successfully');
+          } catch (e) {
+            console.error('[Voice] Error in onResult:', e);
+          }
           onClose();
         }, 800);
       } else {
