@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
 import { VoiceAssistantModal } from "@plane/ui";
@@ -77,9 +78,9 @@ export const GlobalVoiceModal = observer(function GlobalVoiceModal() {
     toggleVoiceModal(false);
   }, [toggleVoiceModal]);
 
-  if (!workspaceSlug) return null;
+  if (!workspaceSlug || !isVoiceModalOpen) return null;
 
-  return (
+  const modalContent = (
     <VoiceAssistantModal
       isOpen={isVoiceModalOpen}
       onClose={handleClose}
@@ -88,4 +89,6 @@ export const GlobalVoiceModal = observer(function GlobalVoiceModal() {
       workspaceSlug={workspaceSlug}
     />
   );
+
+  return createPortal(modalContent, document.body);
 });
