@@ -283,9 +283,13 @@ export const DynamicNotchController: React.FC<DynamicNotchControllerProps> = ({
     };
 
     recognition.onend = () => {
-      if (!isManualStop && recognitionRef.current) {
+      if (!isManualStop && recognitionRef.current && uiState === UIState.LISTENING) {
         try {
-          recognition.start();
+          setTimeout(() => {
+            if (recognitionRef.current && !isManualStop) {
+              recognition.start();
+            }
+          }, 100);
         } catch (e) {
           console.warn('[DynamicNotch] Could not restart:', e);
         }
@@ -318,7 +322,11 @@ export const DynamicNotchController: React.FC<DynamicNotchControllerProps> = ({
     const transcript = transcriptRef.current.trim();
     
     if (!transcript) {
-      setUiState(UIState.MODE_SELECT);
+      setUiState(UIState.IDLE);
+      hideTimeoutRef.current = setTimeout(() => {
+        setIsVisible(false);
+        setSelectedMode(null);
+      }, 1000);
       return;
     }
 
