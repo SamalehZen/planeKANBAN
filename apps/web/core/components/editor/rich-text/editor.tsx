@@ -4,7 +4,6 @@ import { RichTextEditorWithRef } from "@plane/editor";
 import type { EditorRefApi, IRichTextEditorProps, TAIActionPayload, TFileHandler } from "@plane/editor";
 import type { MakeOptional, TSearchEntityRequestPayload, TSearchResponse } from "@plane/types";
 import { cn } from "@plane/utils";
-import { VoiceAssistantModal } from "@plane/ui";
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
 import { EditorMentionsRoot } from "@/components/editor/embeds/mentions";
 import { useEditorConfig, useEditorMention } from "@/hooks/editor";
@@ -62,14 +61,10 @@ export const RichTextEditor = forwardRef(function RichTextEditor(
   });
 
   const editorRefInternal = useRef<EditorRefApi | null>(null);
-  const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
-  const [currentNodeInfo, setCurrentNodeInfo] = useState<{ from: number; to: number } | null>(null);
+  const [isVoiceActive, setIsVoiceActive] = useState(false);
 
   const handleVoiceResult = useCallback(
     (text: string) => {
-      console.log('[Editor] handleVoiceResult called with:', text);
-      console.log('[Editor] editorRefInternal.current:', !!editorRefInternal.current);
-      
       if (!editorRefInternal.current) {
         console.error('[Editor] No editor ref available!');
         return;
@@ -77,27 +72,34 @@ export const RichTextEditor = forwardRef(function RichTextEditor(
       const editor = editorRefInternal.current;
 
       try {
-        console.log('[Editor] Inserting content (HTML supported)');
         editor.insertTextAtCursor(text + " ");
-        console.log('[Editor] Content inserted successfully');
       } catch (e) {
         console.error('[Editor] Error inserting content:', e);
       }
-      setCurrentNodeInfo(null);
     },
     []
   );
 
   const speechHandler = {
-    onStart: (nodeInfo?: { from: number; to: number }) => {
-      setCurrentNodeInfo(nodeInfo || null);
-      setIsVoiceModalOpen(true);
+    onStart: () => {
+      setIsVoiceActive(true);
+      window.dispatchEvent(new CustomEvent('dynamic-notch-trigger', {
+        detail: {
+          workspaceSlug,
+          onTranscript: (text: string) => {
+            setIsVoiceActive(false);
+            handleVoiceResult(text);
+          },
+          onClose: () => {
+            setIsVoiceActive(false);
+          }
+        }
+      }));
     },
     onStop: () => {
-      setIsVoiceModalOpen(false);
-      setCurrentNodeInfo(null);
+      setIsVoiceActive(false);
     },
-    isRecording: () => isVoiceModalOpen,
+    isRecording: () => isVoiceActive,
   };
 
   const handleAISelectionAction = useCallback(
@@ -168,51 +170,38 @@ export const RichTextEditor = forwardRef(function RichTextEditor(
   );
 
   return (
-    <>
-      <RichTextEditorWithRef
-        ref={handleRef}
-        disabledExtensions={[...richTextEditorExtensions.disabled, ...(additionalDisabledExtensions ?? [])]}
-        editable={editable}
-        flaggedExtensions={richTextEditorExtensions.flagged}
-        fileHandler={getEditorFileHandlers({
-          projectId,
-          uploadFile: editable ? props.uploadFile : async () => "",
-          duplicateFile: editable ? props.duplicateFile : async () => "",
-          workspaceId,
-          workspaceSlug,
-        })}
-        getEditorMetaData={getEditorMetaData}
-        mentionHandler={{
-          searchCallback: async (query) => {
-            const res = await fetchMentions(query);
-            if (!res) throw new Error("Failed in fetching mentions");
-            return res;
-          },
-          renderComponent: EditorMentionsRoot,
-          getMentionedEntityDetails: (id) => ({
-            display_name: getUserDetails(id)?.display_name ?? "",
-          }),
-        }}
-        extendedEditorProps={{}}
-        aiHandler={{
-          onSelectionAction: handleAISelectionAction,
-        }}
-        speechHandler={editable ? speechHandler : undefined}
-        {...rest}
-        containerClassName={cn("relative pl-3 pb-3", containerClassName)}
-      />
-
-      <VoiceAssistantModal
-        isOpen={isVoiceModalOpen}
-        onClose={() => {
-          setIsVoiceModalOpen(false);
-          setCurrentNodeInfo(null);
-        }}
-        onResult={handleVoiceResult}
-        language="fr-FR"
-        workspaceSlug={workspaceSlug}
-      />
-    </>
+    <RichTextEditorWithRef
+      ref={handleRef}
+      disabledExtensions={[...richTextEditorExtensions.disabled, ...(additionalDisabledExtensions ?? [])]}
+      editable={editable}
+      flaggedExtensions={richTextEditorExtensions.flagged}
+      fileHandler={getEditorFileHandlers({
+        projectId,
+        uploadFile: editable ? props.uploadFile : async () => "",
+        duplicateFile: editable ? props.duplicateFile : async () => "",
+        workspaceId,
+        workspaceSlug,
+      })}
+      getEditorMetaData={getEditorMetaData}
+      mentionHandler={{
+        searchCallback: async (query) => {
+          const res = await fetchMentions(query);
+          if (!res) throw new Error("Failed in fetching mentions");
+          return res;
+        },
+        renderComponent: EditorMentionsRoot,
+        getMentionedEntityDetails: (id) => ({
+          display_name: getUserDetails(id)?.display_name ?? "",
+        }),
+      }}
+      extendedEditorProps={{}}
+      aiHandler={{
+        onSelectionAction: handleAISelectionAction,
+      }}
+      speechHandler={editable ? speechHandler : undefined}
+      {...rest}
+      containerClassName={cn("relative pl-3 pb-3", containerClassName)}
+    />
   );
 });
 

@@ -4,11 +4,106 @@ import { Mic, Square } from 'lucide-react';
 import { DynamicNotch } from './DynamicNotch';
 import { UIState } from './types';
 
-interface DynamicNotchControllerProps {
-  onVoiceStart?: () => void;
-  onVoiceEnd?: (audioBlob: Blob) => void;
-  onAIResponse?: (text: string) => void;
+interface SpeechRecognitionEvent {
+  results: SpeechRecognitionResultList;
+  resultIndex: number;
+}
+
+interface SpeechRecognitionResultList {
+  length: number;
+  item(index: number): SpeechRecognitionResult;
+  [index: number]: SpeechRecognitionResult;
+}
+
+interface SpeechRecognitionResult {
+  isFinal: boolean;
+  length: number;
+  item(index: number): SpeechRecognitionAlternative;
+  [index: number]: SpeechRecognitionAlternative;
+}
+
+interface SpeechRecognitionAlternative {
+  transcript: string;
+  confidence: number;
+}
+
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start(): void;
+  stop(): void;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onerror: ((event: { error: string }) => void) | null;
+  onend: (() => void) | null;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition: new () => SpeechRecognition;
+    webkitSpeechRecognition: new () => SpeechRecognition;
+  }
+}
+
+const FORMATTING_INSTRUCTIONS = `
+Utilise le formatage HTML suivant pour enrichir le texte:
+- Titres: <h1>, <h2>, <h3>, <h4>, <h5>, <h6>
+- Liste numérotée: <ol><li>item</li></ol>
+- Liste à puces: <ul><li>item</li></ul>
+- Liste de tâches: <ul data-type="taskList"><li data-type="taskItem" data-checked="false">tâche</li></ul>
+- Tableau: <table><tr><th>En-tête</th></tr><tr><td>Cellule</td></tr></table>
+- Citation/Quote: <blockquote><p>texte cité</p></blockquote>
+- Code: <code>code</code> ou <pre><code>bloc de code</code></pre>
+- Callout: <div data-type="callout" data-color="blue">📌 Note importante</div>
+- Séparateur: <hr>
+- Gras: <strong>texte</strong>
+- Italique: <em>texte</em>
+- Couleur: <span style="color: #color">texte</span>
+- Emoji: Utilise des emojis pertinents pour enrichir le texte (📝 ✅ ⚠️ 💡 🎯 📌 🔥 ⭐ 📅 👉 etc.)
+`;
+
+const PROMPTS: Record<string, string> = {
+  auto: `Tu es un assistant de saisie vocale expert en formatage. Analyse le texte dicté et formate-le de manière appropriée en utilisant le formatage riche.
+${FORMATTING_INSTRUCTIONS}
+Détecte le type de contenu (liste, document, email, etc.) et applique le formatage adapté. Corrige les fautes. Réponds UNIQUEMENT avec le HTML formaté.`,
+  
+  email: `Transforme ce texte dicté en email professionnel formaté.
+${FORMATTING_INSTRUCTIONS}
+Structure: <h2>Objet: ...</h2>, puis paragraphes avec <p>, signature en <em>. Réponds UNIQUEMENT avec le HTML.`,
+  
+  prompt: `Transforme ce texte dicté en prompt optimisé pour LLM.
+${FORMATTING_INSTRUCTIONS}
+Utilise <h3> pour les sections, <ul> pour les contraintes, <blockquote> pour les exemples. Réponds UNIQUEMENT avec le HTML.`,
+  
+  message: `Corrige l'orthographe et la grammaire de ce texte dicté.
+Garde le formatage simple avec <p> pour les paragraphes. Corrige sans changer le sens. Réponds UNIQUEMENT avec le HTML.`,
+  
+  note: `Transforme ce texte dicté en liste de tâches structurée.
+${FORMATTING_INSTRUCTIONS}
+Utilise <ul data-type="taskList"><li data-type="taskItem" data-checked="false">tâche</li></ul> pour les tâches.
+Groupe par catégories avec <h3>. Réponds UNIQUEMENT avec le HTML.`,
+  
+  brut: ``,
+  
+  doc: `Transforme ce texte dicté en document structuré et professionnel.
+${FORMATTING_INSTRUCTIONS}
+Utilise <h1> pour le titre, <h2> et <h3> pour les sections, <ul> ou <ol> pour les listes, <blockquote> pour les citations importantes, <table> si nécessaire. Réponds UNIQUEMENT avec le HTML.`,
+  
+  planning: `Transforme ce texte dicté en planning organisé.
+${FORMATTING_INSTRUCTIONS}
+Utilise <table> pour le planning avec colonnes Date/Heure/Tâche, ou <h3> pour chaque jour avec <ul data-type="taskList"> pour les tâches. Réponds UNIQUEMENT avec le HTML.`,
+
+  weather: `Analyse la demande météo et réponds de manière concise avec les informations demandées. Réponds UNIQUEMENT avec le HTML formaté.`,
+};
+
+export interface DynamicNotchControllerProps {
+  onTranscript?: (text: string, isProcessed: boolean) => void;
+  onError?: (error: string) => void;
   theme?: 'light' | 'dark' | 'auto';
+  language?: string;
+  workspaceSlug?: string;
+  disabled?: boolean;
+  showFloatingButton?: boolean;
 }
 
 const useThemeDetector = (): 'light' | 'dark' => {
@@ -64,10 +159,13 @@ const snappySpring = {
 };
 
 export const DynamicNotchController: React.FC<DynamicNotchControllerProps> = ({
-  onVoiceStart,
-  onVoiceEnd,
-  onAIResponse,
-  theme = 'auto'
+  onTranscript,
+  onError,
+  theme = 'auto',
+  language = 'fr-FR',
+  workspaceSlug,
+  disabled = false,
+  showFloatingButton = true,
 }) => {
   const detectedTheme = useThemeDetector();
   const actualTheme: 'light' | 'dark' = theme === 'auto' ? detectedTheme : theme;
@@ -79,19 +177,12 @@ export const DynamicNotchController: React.FC<DynamicNotchControllerProps> = ({
 
   const lastCtrlPressRef = useRef<number>(0);
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
-  const mousePositionRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const transcriptRef = useRef('');
 
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      mousePositionRef.current = { x: e.clientX, y: e.clientY };
-    };
-    window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, []);
+    if (disabled) return;
 
-  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Control') {
         const now = Date.now();
@@ -106,76 +197,176 @@ export const DynamicNotchController: React.FC<DynamicNotchControllerProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [uiState, isVisible]);
+  }, [uiState, isVisible, disabled]);
+
+  const processWithAI = useCallback(async (text: string, mode: string): Promise<string> => {
+    if (mode === 'brut' || !workspaceSlug) {
+      return text;
+    }
+
+    const prompt = PROMPTS[mode];
+    if (!prompt) {
+      return text;
+    }
+
+    try {
+      const response = await fetch(`/api/workspaces/${workspaceSlug}/ai-assistant/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          task: 'voice_assistant',
+          prompt: `${prompt}\n\nTexte: "${text}"`,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Erreur serveur IA');
+      }
+
+      const data = await response.json();
+      return data.response || text;
+    } catch (error) {
+      console.error('[DynamicNotch] AI processing error:', error);
+      throw error;
+    }
+  }, [workspaceSlug]);
 
   const handleDoubleTap = useCallback(() => {
+    if (disabled) return;
+    
     if (!isVisible) {
       setIsVisible(true);
       setUiState(UIState.IDLE);
+      transcriptRef.current = '';
       setTimeout(() => {
         setUiState(UIState.MODE_SELECT);
       }, 200);
     } else if (uiState === UIState.LISTENING) {
       stopRecording();
     }
-  }, [isVisible, uiState]);
+  }, [isVisible, uiState, disabled]);
 
-  const handleModeSelect = useCallback((modeId: string) => {
-    setSelectedMode(modeId);
-    setUiState(UIState.LISTENING);
-    startRecording();
-    onVoiceStart?.();
-  }, [onVoiceStart]);
-
-  const startRecording = useCallback(async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-      audioChunksRef.current = [];
-
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          audioChunksRef.current.push(e.data);
-        }
-      };
-
-      mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        onVoiceEnd?.(audioBlob);
-        stream.getTracks().forEach(track => track.stop());
-      };
-
-      mediaRecorder.start();
-    } catch (err) {
-      console.error('Failed to start recording:', err);
-    }
-  }, [onVoiceEnd]);
-
-  const stopRecording = useCallback(() => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-      mediaRecorderRef.current.stop();
-    }
-    setUiState(UIState.THINKING);
-
-    setTimeout(() => {
+  const startRecording = useCallback((mode: string) => {
+    const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognitionAPI) {
+      onError?.('Speech recognition not supported');
       setUiState(UIState.IDLE);
-      onAIResponse?.('AI generated text');
+      return;
+    }
+
+    setSelectedMode(mode);
+    transcriptRef.current = '';
+
+    const recognition = new SpeechRecognitionAPI();
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.lang = language;
+
+    let isManualStop = false;
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i];
+        if (result.isFinal) {
+          transcriptRef.current += result[0].transcript;
+        }
+      }
+    };
+
+    recognition.onerror = (event: { error: string }) => {
+      if (event.error === 'no-speech' || event.error === 'aborted') {
+        return;
+      }
+      onError?.(event.error);
+    };
+
+    recognition.onend = () => {
+      if (!isManualStop && recognitionRef.current) {
+        try {
+          recognition.start();
+        } catch (e) {
+          console.warn('[DynamicNotch] Could not restart:', e);
+        }
+      }
+    };
+
+    recognitionRef.current = recognition;
+    (recognitionRef.current as any)._isManualStop = () => { isManualStop = true; };
+
+    try {
+      recognition.start();
+      setUiState(UIState.LISTENING);
+    } catch (e) {
+      onError?.('Failed to start recognition');
+    }
+  }, [language, onError]);
+
+  const stopRecording = useCallback(async () => {
+    if (recognitionRef.current) {
+      const recognition = recognitionRef.current as any;
+      if (recognition._isManualStop) {
+        recognition._isManualStop();
+      }
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 150));
+
+    const transcript = transcriptRef.current.trim();
+    
+    if (!transcript) {
+      setUiState(UIState.MODE_SELECT);
+      return;
+    }
+
+    if (selectedMode === 'brut' || !workspaceSlug) {
+      onTranscript?.(transcript, false);
+      setUiState(UIState.IDLE);
       hideTimeoutRef.current = setTimeout(() => {
         setIsVisible(false);
         setSelectedMode(null);
-        setUiState(UIState.IDLE);
+      }, 1500);
+      return;
+    }
+
+    setUiState(UIState.THINKING);
+
+    try {
+      const processed = await processWithAI(transcript, selectedMode || 'auto');
+      onTranscript?.(processed, true);
+      setUiState(UIState.IDLE);
+      hideTimeoutRef.current = setTimeout(() => {
+        setIsVisible(false);
+        setSelectedMode(null);
+      }, 1500);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Erreur IA';
+      onError?.(msg);
+      onTranscript?.(transcript, false);
+      setUiState(UIState.IDLE);
+      hideTimeoutRef.current = setTimeout(() => {
+        setIsVisible(false);
+        setSelectedMode(null);
       }, 3000);
-    }, 3500);
-  }, [onAIResponse]);
+    }
+  }, [selectedMode, workspaceSlug, processWithAI, onTranscript, onError]);
+
+  const handleModeSelect = useCallback((modeId: string) => {
+    startRecording(modeId);
+  }, [startRecording]);
 
   const handleMicClick = useCallback(() => {
+    if (disabled) return;
     setIsVisible(true);
     setUiState(UIState.IDLE);
+    transcriptRef.current = '';
     setTimeout(() => {
       setUiState(UIState.MODE_SELECT);
     }, 200);
-  }, []);
+  }, [disabled]);
 
   const handleStopClick = useCallback(() => {
     stopRecording();
@@ -184,11 +375,13 @@ export const DynamicNotchController: React.FC<DynamicNotchControllerProps> = ({
   useEffect(() => {
     return () => {
       if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
-      if (mediaRecorderRef.current?.state === 'recording') {
-        mediaRecorderRef.current.stop();
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
       }
     };
   }, []);
+
+  if (disabled) return null;
 
   return (
     <>
@@ -204,7 +397,7 @@ export const DynamicNotchController: React.FC<DynamicNotchControllerProps> = ({
       </AnimatePresence>
 
       <AnimatePresence>
-        {!isVisible && (
+        {showFloatingButton && !isVisible && (
           <motion.button
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -257,3 +450,5 @@ export const DynamicNotchController: React.FC<DynamicNotchControllerProps> = ({
     </>
   );
 };
+
+export type { SpeechRecognition, SpeechRecognitionEvent };

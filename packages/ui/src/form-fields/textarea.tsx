@@ -1,6 +1,6 @@
-import React, { useRef, useCallback } from "react";
-import { Loader2, Mic, MicOff } from "lucide-react";
-import { useSpeechToText, useAITextSelection } from "@plane/hooks";
+import React, { useRef, useCallback, useState } from "react";
+import { Mic, MicOff } from "lucide-react";
+import { useAITextSelection } from "@plane/hooks";
 import { useAutoResizeTextArea } from "../hooks/use-auto-resize-textarea";
 import { Tooltip } from "../tooltip";
 import { cn } from "../utils";
@@ -44,8 +44,8 @@ const TextArea = React.forwardRef<HTMLTextAreaElement, TextAreaProps>(
     } = props;
 
     const textAreaRef = useRef<HTMLTextAreaElement | null>(null);
+    const [isListening, setIsListening] = useState(false);
 
-    /** 🔗 Ref unifiée */
     const setRefs = useCallback(
       (node: HTMLTextAreaElement | null) => {
         textAreaRef.current = node;
@@ -57,19 +57,21 @@ const TextArea = React.forwardRef<HTMLTextAreaElement, TextAreaProps>(
 
     useAutoResizeTextArea(textAreaRef, value);
 
-    /* ───────────────────────── 🎤 SPEECH TO TEXT ───────────────────────── */
+    /* ───────────────────────── 🎤 DYNAMIC NOTCH SPEECH ───────────────────────── */
 
-    const handleSpeechTranscript = useCallback(
-      (text: string, isFinal: boolean) => {
-        if (!isFinal || !textAreaRef.current || !onChange) return;
+    const handleVoiceTranscript = useCallback(
+      (text: string) => {
+        if (!textAreaRef.current || !onChange) return;
 
         const textarea = textAreaRef.current;
-        const start = textarea.selectionStart ?? 0;
-        const end = textarea.selectionEnd ?? 0;
+        const start = textarea.selectionStart ?? textarea.value.length;
+        const end = textarea.selectionEnd ?? textarea.value.length;
 
+        const cleanText = text.replace(/<[^>]*>/g, '').trim();
+        
         const newValue =
           textarea.value.slice(0, start) +
-          text +
+          cleanText +
           " " +
           textarea.value.slice(end);
 
@@ -81,7 +83,7 @@ const TextArea = React.forwardRef<HTMLTextAreaElement, TextAreaProps>(
         onChange(syntheticEvent);
 
         requestAnimationFrame(() => {
-          const cursor = start + text.length + 1;
+          const cursor = start + cleanText.length + 1;
           textarea.setSelectionRange(cursor, cursor);
           textarea.focus();
         });
@@ -89,15 +91,24 @@ const TextArea = React.forwardRef<HTMLTextAreaElement, TextAreaProps>(
       [onChange]
     );
 
-    const { isRecording, isConnecting, startRecording, stopRecording } =
-      useSpeechToText({
-        workspaceSlug: workspaceSlug || "",
-        onTranscript: handleSpeechTranscript,
-      });
-
     const handleMicClick = useCallback(() => {
-      isRecording ? stopRecording() : startRecording();
-    }, [isRecording, startRecording, stopRecording]);
+      if (isListening) return;
+      
+      setIsListening(true);
+      
+      window.dispatchEvent(new CustomEvent('dynamic-notch-trigger', {
+        detail: {
+          workspaceSlug,
+          onTranscript: (text: string) => {
+            setIsListening(false);
+            handleVoiceTranscript(text);
+          },
+          onClose: () => {
+            setIsListening(false);
+          }
+        }
+      }));
+    }, [workspaceSlug, handleVoiceTranscript, isListening]);
 
     const isSpeechAvailable = speechEnabled && !!workspaceSlug;
 
@@ -153,34 +164,24 @@ const TextArea = React.forwardRef<HTMLTextAreaElement, TextAreaProps>(
           {...rest}
         />
 
-        {/* 🎤 Micro */}
+        {/* 🎤 Micro - Triggers DynamicNotch */}
         {isSpeechAvailable && (
           <Tooltip
-            tooltipContent={
-              isConnecting
-                ? "Connecting..."
-                : isRecording
-                ? "Stop recording"
-                : "Voice input"
-            }
+            tooltipContent={isListening ? "En écoute..." : "Saisie vocale (Double Ctrl)"}
           >
             <button
               type="button"
               onClick={handleMicClick}
-              disabled={isConnecting}
               className={cn(
                 "absolute right-2 bottom-2 grid place-items-center size-6 rounded-md transition-all",
                 {
-                  "bg-red-500 text-white animate-pulse": isRecording,
+                  "bg-red-500 text-white animate-pulse": isListening,
                   "bg-layer-1 text-tertiary hover:bg-layer-2 hover:text-secondary":
-                    !isRecording,
-                  "opacity-50 cursor-not-allowed": isConnecting,
+                    !isListening,
                 }
               )}
             >
-              {isConnecting ? (
-                <Loader2 className="size-3.5 animate-spin" />
-              ) : isRecording ? (
+              {isListening ? (
                 <MicOff className="size-3.5" />
               ) : (
                 <Mic className="size-3.5" />
