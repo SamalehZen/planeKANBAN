@@ -1,25 +1,23 @@
-import { DynamicNotchController } from '@plane/ui';
+import { GlobalDynamicNotch } from '@plane/ui';
+import { useParams } from 'next/navigation';
 
 export const GlobalVoiceModal: React.FC = () => {
-  const handleVoiceStart = () => {
-    console.log('Voice recording started');
-  };
+  const params = useParams();
+  const workspaceSlug = params?.workspaceSlug as string | undefined;
 
-  const handleVoiceEnd = (audioBlob: Blob) => {
-    console.log('Voice recording ended, blob size:', audioBlob.size);
-  };
-
-  const handleAIResponse = (text: string) => {
-    console.log('AI response:', text);
+  const handleTranscript = (text: string, isProcessed: boolean) => {
+    console.log('[GlobalVoice] Transcript received:', text.substring(0, 50), 'processed:', isProcessed);
+    
     const activeElement = document.activeElement;
     
     if (activeElement instanceof HTMLInputElement || activeElement instanceof HTMLTextAreaElement) {
       const start = activeElement.selectionStart ?? activeElement.value.length;
       const end = activeElement.selectionEnd ?? activeElement.value.length;
       const currentValue = activeElement.value;
-      const newValue = currentValue.slice(0, start) + text + currentValue.slice(end);
+      const cleanText = text.replace(/<[^>]*>/g, '').trim();
+      const newValue = currentValue.slice(0, start) + cleanText + currentValue.slice(end);
       activeElement.value = newValue;
-      activeElement.setSelectionRange(start + text.length, start + text.length);
+      activeElement.setSelectionRange(start + cleanText.length, start + cleanText.length);
       activeElement.dispatchEvent(new Event("input", { bubbles: true }));
       activeElement.dispatchEvent(new Event("change", { bubbles: true }));
       return;
@@ -31,10 +29,22 @@ export const GlobalVoiceModal: React.FC = () => {
       if (selection && selection.rangeCount > 0) {
         const range = selection.getRangeAt(0);
         range.deleteContents();
-        const textNode = document.createTextNode(text);
-        range.insertNode(textNode);
-        range.setStartAfter(textNode);
-        range.setEndAfter(textNode);
+        
+        if (isProcessed && text.includes('<')) {
+          const temp = document.createElement('div');
+          temp.innerHTML = text;
+          const fragment = document.createDocumentFragment();
+          while (temp.firstChild) {
+            fragment.appendChild(temp.firstChild);
+          }
+          range.insertNode(fragment);
+        } else {
+          const textNode = document.createTextNode(text);
+          range.insertNode(textNode);
+          range.setStartAfter(textNode);
+          range.setEndAfter(textNode);
+        }
+        
         selection.removeAllRanges();
         selection.addRange(range);
         proseMirror.dispatchEvent(new Event("input", { bubbles: true }));
@@ -42,17 +52,17 @@ export const GlobalVoiceModal: React.FC = () => {
       return;
     }
 
-    navigator.clipboard.writeText(text).then(() => {
-      console.log("[GlobalVoice] Text copied to clipboard:", text.substring(0, 50));
+    navigator.clipboard.writeText(text.replace(/<[^>]*>/g, '')).then(() => {
+      console.log("[GlobalVoice] Text copied to clipboard");
     });
   };
 
   return (
-    <DynamicNotchController
-      onVoiceStart={handleVoiceStart}
-      onVoiceEnd={handleVoiceEnd}
-      onAIResponse={handleAIResponse}
+    <GlobalDynamicNotch
+      workspaceSlug={workspaceSlug}
+      language="fr-FR"
       theme="auto"
+      showFloatingButton={true}
     />
   );
 };

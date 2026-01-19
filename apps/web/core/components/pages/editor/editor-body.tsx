@@ -16,7 +16,7 @@ import type {
 import { AI_EDITOR_TASKS } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
 import type { TSearchEntityRequestPayload, TSearchResponse, TWebhookConnectionQueryParams } from "@plane/types";
-import { ERowVariant, Row, VoiceAssistantModal } from "@plane/ui";
+import { ERowVariant, Row } from "@plane/ui";
 import { cn, generateRandomColor, hslToHex } from "@plane/utils";
 import { EditorMentionsRoot } from "@/components/editor/embeds/mentions";
 import { useEditorMention } from "@/hooks/editor";
@@ -140,14 +140,11 @@ export const PageEditorBody = observer(function PageEditorBody(props: Props) {
     });
   }, [pageId, setSyncingStatus, onCollaborationStateChange]);
 
-  const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
-  const [currentNodeInfo, setCurrentNodeInfo] = useState<{ from: number; to: number } | null>(null);
+  const [isVoiceActive, setIsVoiceActive] = useState(false);
 
   const handleVoiceResult = useCallback(
     (text: string) => {
-      console.log('[PageEditor] handleVoiceResult called with:', text);
       const editor = editorForwardRef?.current || editorRef?.current;
-      console.log('[PageEditor] editor ref:', !!editor);
       
       if (!editor) {
         console.error("[PageEditor] No editor ref available");
@@ -155,30 +152,37 @@ export const PageEditorBody = observer(function PageEditorBody(props: Props) {
       }
 
       try {
-        console.log('[PageEditor] Inserting content (HTML supported)');
         editor.insertTextAtCursor(text + " ");
-        console.log('[PageEditor] Content inserted successfully');
       } catch (e) {
         console.error('[PageEditor] Error inserting content:', e);
       }
-      setCurrentNodeInfo(null);
     },
     [editorRef, editorForwardRef]
   );
 
   const speechHandler = useMemo(
     () => ({
-      onStart: (nodeInfo?: { from: number; to: number }) => {
-        setCurrentNodeInfo(nodeInfo || null);
-        setIsVoiceModalOpen(true);
+      onStart: () => {
+        setIsVoiceActive(true);
+        window.dispatchEvent(new CustomEvent('dynamic-notch-trigger', {
+          detail: {
+            workspaceSlug,
+            onTranscript: (text: string) => {
+              setIsVoiceActive(false);
+              handleVoiceResult(text);
+            },
+            onClose: () => {
+              setIsVoiceActive(false);
+            }
+          }
+        }));
       },
       onStop: () => {
-        setIsVoiceModalOpen(false);
-        setCurrentNodeInfo(null);
+        setIsVoiceActive(false);
       },
-      isRecording: () => isVoiceModalOpen,
+      isRecording: () => isVoiceActive,
     }),
-    [isVoiceModalOpen]
+    [isVoiceActive, workspaceSlug, handleVoiceResult]
   );
 
   const getAIMenu = useCallback(
@@ -296,85 +300,72 @@ export const PageEditorBody = observer(function PageEditorBody(props: Props) {
   if (isPageLoading) return <PageContentLoader className={blockWidthClassName} />;
 
   return (
-    <>
-      <Row
-        className="relative size-full flex flex-col overflow-y-auto overflow-x-hidden vertical-scrollbar scrollbar-md duration-200"
-        variant={ERowVariant.HUGGING}
-      >
-        <div id="page-content-container" className="relative w-full flex-shrink-0">
-          {!isNavigationPaneOpen && (
-            <div className="page-summary-container absolute h-full right-0 top-[64px] z-[5]">
-              <div className="sticky top-[72px]">
-                <div className="group/page-toc relative px-page-x">
-                  <div
-                    className="!cursor-pointer max-h-[50vh] overflow-hidden"
-                    role="button"
-                    aria-label={t("page_navigation_pane.outline_floating_button")}
-                    onClick={handleOpenNavigationPane}
-                  >
-                    <PageContentBrowser className="overflow-y-auto" editorRef={editorRef} showOutline />
-                  </div>
-                  <div className="absolute top-0 right-0 opacity-0 translate-x-1/2 pointer-events-none group-hover/page-toc:opacity-100 group-hover/page-toc:-translate-x-1/4 group-hover/page-toc:pointer-events-auto transition-all duration-300 w-52 max-h-[70vh] overflow-y-scroll vertical-scrollbar scrollbar-sm whitespace-nowrap bg-surface-2 p-4 rounded-sm">
-                    <PageContentBrowser className="overflow-y-auto" editorRef={editorRef} />
-                  </div>
+    <Row
+      className="relative size-full flex flex-col overflow-y-auto overflow-x-hidden vertical-scrollbar scrollbar-md duration-200"
+      variant={ERowVariant.HUGGING}
+    >
+      <div id="page-content-container" className="relative w-full flex-shrink-0">
+        {!isNavigationPaneOpen && (
+          <div className="page-summary-container absolute h-full right-0 top-[64px] z-[5]">
+            <div className="sticky top-[72px]">
+              <div className="group/page-toc relative px-page-x">
+                <div
+                  className="!cursor-pointer max-h-[50vh] overflow-hidden"
+                  role="button"
+                  aria-label={t("page_navigation_pane.outline_floating_button")}
+                  onClick={handleOpenNavigationPane}
+                >
+                  <PageContentBrowser className="overflow-y-auto" editorRef={editorRef} showOutline />
+                </div>
+                <div className="absolute top-0 right-0 opacity-0 translate-x-1/2 pointer-events-none group-hover/page-toc:opacity-100 group-hover/page-toc:-translate-x-1/4 group-hover/page-toc:pointer-events-auto transition-all duration-300 w-52 max-h-[70vh] overflow-y-scroll vertical-scrollbar scrollbar-sm whitespace-nowrap bg-surface-2 p-4 rounded-sm">
+                  <PageContentBrowser className="overflow-y-auto" editorRef={editorRef} />
                 </div>
               </div>
             </div>
-          )}
-          <div>
-            <div className="page-header-container group/page-header">
-              <div className={blockWidthClassName}>
-                <PageEditorHeaderRoot page={page} projectId={projectId} />
-              </div>
-            </div>
-            <CollaborativeDocumentEditorWithRef
-              editable={isContentEditable}
-              id={pageId}
-              fileHandler={config.fileHandler}
-              handleEditorReady={handleEditorReady}
-              ref={editorForwardRef}
-              titleRef={titleEditorRef}
-              containerClassName="h-full p-0 pb-64"
-              displayConfig={displayConfig}
-              getEditorMetaData={getEditorMetaData}
-              mentionHandler={{
-                searchCallback: async (query) => {
-                  const res = await fetchMentions(query);
-                  if (!res) throw new Error("Failed in fetching mentions");
-                  return res;
-                },
-                renderComponent: (props) => <EditorMentionsRoot {...props} />,
-                getMentionedEntityDetails: (id: string) => ({ display_name: getUserDetails(id)?.display_name ?? "" }),
-              }}
-              updatePageProperties={updatePageProperties}
-              realtimeConfig={realtimeConfig}
-              serverHandler={serverHandler}
-              user={userConfig}
-              disabledExtensions={documentEditorExtensions.disabled}
-              flaggedExtensions={documentEditorExtensions.flagged}
-              aiHandler={{
-                menu: getAIMenu,
-                onSelectionAction: handleAISelectionAction,
-              }}
-              speechHandler={isContentEditable ? speechHandler : undefined}
-              onAssetChange={updateAssetsList}
-              extendedEditorProps={extendedEditorProps}
-              isFetchingFallbackBinary={isFetchingFallbackBinary}
-            />
           </div>
+        )}
+        <div>
+          <div className="page-header-container group/page-header">
+            <div className={blockWidthClassName}>
+              <PageEditorHeaderRoot page={page} projectId={projectId} />
+            </div>
+          </div>
+          <CollaborativeDocumentEditorWithRef
+            editable={isContentEditable}
+            id={pageId}
+            fileHandler={config.fileHandler}
+            handleEditorReady={handleEditorReady}
+            ref={editorForwardRef}
+            titleRef={titleEditorRef}
+            containerClassName="h-full p-0 pb-64"
+            displayConfig={displayConfig}
+            getEditorMetaData={getEditorMetaData}
+            mentionHandler={{
+              searchCallback: async (query) => {
+                const res = await fetchMentions(query);
+                if (!res) throw new Error("Failed in fetching mentions");
+                return res;
+              },
+              renderComponent: (props) => <EditorMentionsRoot {...props} />,
+              getMentionedEntityDetails: (id: string) => ({ display_name: getUserDetails(id)?.display_name ?? "" }),
+            }}
+            updatePageProperties={updatePageProperties}
+            realtimeConfig={realtimeConfig}
+            serverHandler={serverHandler}
+            user={userConfig}
+            disabledExtensions={documentEditorExtensions.disabled}
+            flaggedExtensions={documentEditorExtensions.flagged}
+            aiHandler={{
+              menu: getAIMenu,
+              onSelectionAction: handleAISelectionAction,
+            }}
+            speechHandler={isContentEditable ? speechHandler : undefined}
+            onAssetChange={updateAssetsList}
+            extendedEditorProps={extendedEditorProps}
+            isFetchingFallbackBinary={isFetchingFallbackBinary}
+          />
         </div>
-      </Row>
-
-      <VoiceAssistantModal
-        isOpen={isVoiceModalOpen}
-        onClose={() => {
-          setIsVoiceModalOpen(false);
-          setCurrentNodeInfo(null);
-        }}
-        onResult={handleVoiceResult}
-        language="fr-FR"
-        workspaceSlug={workspaceSlug}
-      />
-    </>
+      </div>
+    </Row>
   );
 });

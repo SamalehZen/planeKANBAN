@@ -1,7 +1,7 @@
 import * as React from "react";
-import { useRef, useCallback } from "react";
-import { Loader2, Mic, MicOff } from "lucide-react";
-import { useSpeechToText, useAITextSelection } from "@plane/hooks";
+import { useRef, useCallback, useState } from "react";
+import { Mic, MicOff } from "lucide-react";
+import { useAITextSelection } from "@plane/hooks";
 import { Tooltip } from "../tooltip";
 import { cn } from "../utils";
 import { FloatingAIMenu, type TAIActionPayload } from "../ai-menu/floating-ai-menu";
@@ -47,8 +47,8 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(function Input(
   } = props;
 
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const [isListening, setIsListening] = useState(false);
 
-  /** 🔗 Ref unifiée (robuste & standard) */
   const setRefs = useCallback(
     (node: HTMLInputElement | null) => {
       inputRef.current = node;
@@ -58,19 +58,21 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(function Input(
     [ref]
   );
 
-  /* ───────────────────────── 🎤 SPEECH TO TEXT ───────────────────────── */
+  /* ───────────────────────── 🎤 DYNAMIC NOTCH SPEECH ───────────────────────── */
 
-  const handleSpeechTranscript = useCallback(
-    (text: string, isFinal: boolean) => {
-      if (!isFinal || !inputRef.current || !onChange) return;
+  const handleVoiceTranscript = useCallback(
+    (text: string) => {
+      if (!inputRef.current || !onChange) return;
 
       const input = inputRef.current;
-      const start = input.selectionStart ?? 0;
-      const end = input.selectionEnd ?? 0;
+      const start = input.selectionStart ?? input.value.length;
+      const end = input.selectionEnd ?? input.value.length;
 
+      const cleanText = text.replace(/<[^>]*>/g, '').trim();
+      
       const newValue =
         input.value.slice(0, start) +
-        text +
+        cleanText +
         " " +
         input.value.slice(end);
 
@@ -81,9 +83,8 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(function Input(
 
       onChange(syntheticEvent);
 
-      /** 🎯 Cursor précis (meilleur que setTimeout) */
       requestAnimationFrame(() => {
-        const cursor = start + text.length + 1;
+        const cursor = start + cleanText.length + 1;
         input.setSelectionRange(cursor, cursor);
         input.focus();
       });
@@ -91,15 +92,24 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(function Input(
     [onChange]
   );
 
-  const { isRecording, isConnecting, startRecording, stopRecording } =
-    useSpeechToText({
-      workspaceSlug: workspaceSlug || "",
-      onTranscript: handleSpeechTranscript,
-    });
-
   const handleMicClick = useCallback(() => {
-    isRecording ? stopRecording() : startRecording();
-  }, [isRecording, startRecording, stopRecording]);
+    if (isListening) return;
+    
+    setIsListening(true);
+    
+    window.dispatchEvent(new CustomEvent('dynamic-notch-trigger', {
+      detail: {
+        workspaceSlug,
+        onTranscript: (text: string) => {
+          setIsListening(false);
+          handleVoiceTranscript(text);
+        },
+        onClose: () => {
+          setIsListening(false);
+        }
+      }
+    }));
+  }, [workspaceSlug, handleVoiceTranscript, isListening]);
 
   const isSpeechAvailable = speechEnabled && !!workspaceSlug;
 
@@ -154,34 +164,24 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(function Input(
         {...rest}
       />
 
-      {/* 🎤 Micro */}
+      {/* 🎤 Micro - Triggers DynamicNotch */}
       {isSpeechAvailable && (
         <Tooltip
-          tooltipContent={
-            isConnecting
-              ? "Connecting..."
-              : isRecording
-              ? "Stop recording"
-              : "Voice input"
-          }
+          tooltipContent={isListening ? "En écoute..." : "Saisie vocale (Double Ctrl)"}
         >
           <button
             type="button"
             onClick={handleMicClick}
-            disabled={isConnecting}
             className={cn(
               "absolute right-2 top-1/2 -translate-y-1/2 grid place-items-center size-6 rounded-md transition-all",
               {
-                "bg-red-500 text-white animate-pulse": isRecording,
+                "bg-red-500 text-white animate-pulse": isListening,
                 "bg-layer-1 text-tertiary hover:bg-layer-2 hover:text-secondary":
-                  !isRecording,
-                "opacity-50 cursor-not-allowed": isConnecting,
+                  !isListening,
               }
             )}
           >
-            {isConnecting ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : isRecording ? (
+            {isListening ? (
               <MicOff className="size-3.5" />
             ) : (
               <Mic className="size-3.5" />
@@ -190,7 +190,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(function Input(
         </Tooltip>
       )}
 
-      {/* 🤖 Menu IA (même stacking context → moins de bugs UI) */}
+      {/* 🤖 Menu IA */}
       {aiEnabled && onAIAction && (
         <FloatingAIMenu
           isVisible={isMenuVisible}

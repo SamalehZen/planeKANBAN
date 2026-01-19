@@ -1,4 +1,5 @@
 export * from "./use-ai-text-selection";
+export * from "./use-dynamic-notch";
 export * from "./use-hash-scroll";
 export * from "./use-local-storage";
 export * from "./use-outside-click-detector";
