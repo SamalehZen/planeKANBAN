@@ -1,11 +1,10 @@
-# Plane Branding Kit
+# HyperFIX Branding Kit
 
 ## Brand Overview
-**Plane** - Open-source project management for modern teams
+**HyperFIX** - Project management for modern teams
 
 ### Slogan / Tagline
-*"The open source project planning tool"*
-*"Issue tracking tool you'll enjoy using"*
+*"The project planning tool you'll enjoy using"*
 
 ---
 
@@ -64,6 +63,16 @@ Standalone SVG files in multiple color variants:
 - `plane-lockup.svg` - Blue (#3F76FF)
 - `plane-lockup-white.svg` - White
 - `plane-lockup-black.svg` - Black
+
+**🆕 HyperFIX Wordmark (Text Only - "HyperFIX")**
+- `hyperfix-wordmark.svg` - Blue (#3F76FF)
+- `hyperfix-wordmark-white.svg` - White
+- `hyperfix-wordmark-black.svg` - Black
+
+**🆕 HyperFIX Lockup (Logo Icon + "HyperFIX")**
+- `hyperfix-lockup.svg` - Blue (#3F76FF)
+- `hyperfix-lockup-white.svg` - White
+- `hyperfix-lockup-black.svg` - Black
 
 ---
 
